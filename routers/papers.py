@@ -138,8 +138,8 @@ async def upload_pdf(
     # 保存临时文件
     try:
         # 创建临时文件
-        suffix = Path(file.filename).suffix
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+        suffix = Path(file.filename).suffix#suffix函数返回文件的后缀名
+        with tempfile.NamedTemporaryFile(delete=True, suffix=suffix) as tmp_file:
             content = await file.read()
             tmp_file.write(content)
             tmp_file_path = tmp_file.name

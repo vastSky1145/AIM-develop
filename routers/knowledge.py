@@ -131,7 +131,9 @@ async def upload_pdf(
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
             content = await file.read()
             tmp_file.write(content)
+            print(f"tmp_file: {tmp_file.name}")
             tmp_file_path = tmp_file.name
+            print(f"tmp_file_path: {tmp_file_path}")
 
         # 使用doc2x解析PDF
         app_key = "sk-bzllfk7oftj7tv4he6rc7bfdz92iqtn0"
@@ -142,9 +144,12 @@ async def upload_pdf(
         cc = Path(tmp_file_path).name.rstrip('pdf')
         co = Path(cc).name.rstrip('.')
         output_txt = f"./Output/{co}/{co}.txt"
-
+        print(f"output_txt: {output_txt}")
         with open(output_txt, 'r', encoding='utf-8') as f:
             raw_content = f.read()
+        #删除output_txt文件
+        if os.path.exists(output_txt):
+            os.remove(output_txt)
 
         # 过滤内容
         pure_content = filter_paper_content(raw_content)
