@@ -1,5 +1,5 @@
 import os
-import comtypes.client
+# import comtypes.client
 import subprocess
 from pathlib import Path
 import json
@@ -123,11 +123,11 @@ def pdf_to_json(filepath, user_id, output_path=default_output_path):
     print(type(parsed_data_dumps))
     return parsed_data_dumps
 
-if __name__ == '__main__':
-    load_dotenv(verbose=True)
-    # MY_API_KEY = os.getenv("CSU_API_KEY")  # 这里修改为你获取的API-KEY
-    # API_BASE_URL = os.getenv("CSU_BASE_URL")
-    # print("API_BASE_URL",API_BASE_URL)
-    # print("MY_API_KEY",MY_API_KEY)
-    filepath = "C:/Users/29938/Downloads/test.pptx"
-    ppt_to_json(filepath,"sxs")
+# if __name__ == '__main__':
+#     load_dotenv(verbose=True)
+#     # MY_API_KEY = os.getenv("CSU_API_KEY")  # 这里修改为你获取的API-KEY
+#     # API_BASE_URL = os.getenv("CSU_BASE_URL")
+#     # print("API_BASE_URL",API_BASE_URL)
+#     # print("MY_API_KEY",MY_API_KEY)
+#     filepath = "C:/Users/29938/Downloads/test.pptx"
+#     ppt_to_json(filepath,"sxs")

@@ -14,7 +14,7 @@ from schemas.paper import (
 from schemas.common import Response
 from mongodb import PaperDatabase
 from routers.auth import get_current_user
-from ppt_to_json import ppt_to_json
+# from ppt_to_json import ppt_to_json
 from typing import List
 import json
 import tempfile
@@ -52,65 +52,65 @@ async def get_paper_list(current_user: dict = Depends(get_current_user)):
     )
 
 #旧api，上传参数为file，现在改为pdf文件
-@router.post("/upload-ppt", response_model=Response[PaperResponse], summary="上传PPT并解析")
-async def upload_ppt(
-    file: UploadFile = File(..., description="PPT文件"),
-    current_user: dict = Depends(get_current_user)
-):
-    """
-    上传PPT文件并解析为论文结构
-
-    - 支持.ppt和.pptx格式
-    - 自动解析为结构化JSON
-    - 保存到数据库
-    """
-    # user_id = current_user.get("user_id")
-    user_id = current_user.get("uid")
-
-    # 验证文件类型
-    if not file.filename.endswith(('.ppt', '.pptx')):
-        raise HTTPException(
-            status_code=400,
-            detail="只支持PPT文件格式（.ppt或.pptx）"
-        )
-
-    # 保存临时文件
-    try:
-        # 创建临时文件
-        suffix = Path(file.filename).suffix
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-            content = await file.read()
-            tmp_file.write(content)
-            tmp_file_path = tmp_file.name
-
-        # 调用PPT解析函数
-        json_content = ppt_to_json(tmp_file_path, user_id)
-        paper_data = json.loads(json_content)
-
-        # 保存到数据库
-        paper_id = db.save_paper(paper_data)
-
-        if paper_id is None:
-            raise HTTPException(
-                status_code=500,
-                detail="保存论文到数据库失败"
-            )
-
-        return Response(
-            success=True,
-            message="PPT解析成功",
-            data=paper_data
-        )
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"PPT解析失败: {str(e)}"
-        )
-    finally:
-        # 清理临时文件
-        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
-            os.unlink(tmp_file_path)
+# @router.post("/upload-ppt", response_model=Response[PaperResponse], summary="上传PPT并解析")
+# async def upload_ppt(
+#     file: UploadFile = File(..., description="PPT文件"),
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """
+#     上传PPT文件并解析为论文结构
+#
+#     - 支持.ppt和.pptx格式
+#     - 自动解析为结构化JSON
+#     - 保存到数据库
+#     """
+#     # user_id = current_user.get("user_id")
+#     user_id = current_user.get("uid")
+#
+#     # 验证文件类型
+#     if not file.filename.endswith(('.ppt', '.pptx')):
+#         raise HTTPException(
+#             status_code=400,
+#             detail="只支持PPT文件格式（.ppt或.pptx）"
+#         )
+#
+#     # 保存临时文件
+#     try:
+#         # 创建临时文件
+#         suffix = Path(file.filename).suffix
+#         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
+#             content = await file.read()
+#             tmp_file.write(content)
+#             tmp_file_path = tmp_file.name
+#
+#         # 调用PPT解析函数
+#         json_content = ppt_to_json(tmp_file_path, user_id)
+#         paper_data = json.loads(json_content)
+#
+#         # 保存到数据库
+#         paper_id = db.save_paper(paper_data)
+#
+#         if paper_id is None:
+#             raise HTTPException(
+#                 status_code=500,
+#                 detail="保存论文到数据库失败"
+#             )
+#
+#         return Response(
+#             success=True,
+#             message="PPT解析成功",
+#             data=paper_data
+#         )
+#
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"PPT解析失败: {str(e)}"
+#         )
+#     finally:
+#         # 清理临时文件
+#         if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
+#             os.unlink(tmp_file_path)
 
 #新api，上传参数为pdf文件（由用户在本地ppt转化的pdf文件）
 @router.post("/upload-pdf", response_model=Response[PaperResponse], summary="上传pdf文件并解析")
