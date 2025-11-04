@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>增强版知识库系统 - Web版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+        }
+        
+        .header .status {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .toolbar {
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .search-section {
+            padding: 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .search-box {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #e0e0e0;
+            background: #f8f9fa;
+        }
+        
+        .tab {
+            padding: 15px 30px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+        
+        .tab.active {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            margin-bottom: -2px;
+        }
+        
+        .tab:hover {
+            color: #667eea;
+            background: #f0f0f0;
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+            min-height: 400px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .result-item {
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+        
+        .result-item .title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .result-item .content {
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .result-item .meta {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .source-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        
+        .source-item:hover {
+            background: #e9ecef;
+            transform: translateX(5px);
+        }
+        
+        .source-info .name {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        
+        .source-info .count {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-bar-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+        
+        .upload-area {
+            border: 2px dashed #ddd;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .upload-area:hover {
+            border-color: #667eea;
+            background: #f8f9fa;
+        }
+        
+        .upload-area.dragover {
+            border-color: #667eea;
+            background: #e8ecff;
+        }
+        
+        .status-bar {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            font-size: 14px;
+        }
+        
+        .status-bar.error {
+            background: #e74c3c;
+        }
+        
+        .status-bar.warning {
+            background: #f39c12;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #999;
+        }
+        
+        .empty-state i {
+            font-size: 48px;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading::after {
+            content: '⏳';
+            font-size: 32px;
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <div class="header">
+            <h1>📚 增强版知识库系统</h1>
+            <div class="status" id="statusText">系统就绪</div>
+        </div>
+        
+        <!-- 工具栏 -->
+        <div class="toolbar">
+            <input type="file" id="pdfFileInput" accept=".pdf" style="display:none;">
+            <button class="btn btn-primary" onclick="document.getElementById('pdfFileInput').click()">
+                📄 上传PDF
+            </button>
+            <button class="btn btn-secondary" onclick="viewSources()">
+                📋 查看来源
+            </button>
+            <button class="btn btn-danger" onclick="deleteKnowledge()">
+                🗑️ 删除内容
+            </button>
+        </div>
+        
+        <!-- 搜索区域 -->
+        <div class="search-section">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="输入关键词搜索知识库..." 
+                       onkeypress="if(event.key==='Enter')searchKnowledge()">
+                <button class="btn btn-primary" onclick="searchKnowledge()">🔍 搜索</button>
+            </div>
+        </div>
+        
+        <!-- 标签页 -->
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('search')">检索结果</button>
+            <button class="tab" onclick="switchTab('sources')">知识库内容</button>
+        </div>
+        
+        <!-- 标签页内容 -->
+        <div id="searchTab" class="tab-content active">
+            <div id="searchResults">
+                <div class="empty-state">
+                    <div>🔍</div>
+                    <p>在上方输入关键词开始检索</p>
+                </div>
+            </div>
+        </div>
+        
+        <div id="sourcesTab" class="tab-content">
+            <div id="sourcesContent">
+                <div class="empty-state">
+                    <div>📚</div>
+                    <p>点击"查看来源"加载知识库内容</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 状态栏 -->
+        <div class="status-bar" id="statusBar">系统就绪 | 可上传PDF或进行知识检索</div>
+    </div>
+    
+    <script>
+        // API配置
+        const API_BASE = 'http://localhost:8000';
+        let token = localStorage.getItem('token') || '';
+        
+        // 如果没有token，提示登录
+        if (!token) {
+            const userToken = prompt('请输入登录Token（先在主页面登录获取）：');
+            if (userToken) {
+                token = userToken;
+                localStorage.setItem('token', token);
+            }
+        }
+        
+        // 文件上传
+        document.getElementById('pdfFileInput').addEventListener('change', uploadPDF);
+        
+        async function uploadPDF(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // 验证文件
+            if (!file.name.endsWith('.pdf')) {
+                updateStatus('只支持PDF文件！', 'error');
+                return;
+            }
+            
+            if (file.name.includes(' ')) {
+                updateStatus('文件名不能包含空格！', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            updateStatus('正在上传和解析PDF...', 'warning');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/upload-pdf`, {
+                    method: 'POST',
+                    headers: {'Authorization': `Bearer ${token}`},
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStatus(`✓ ${data.message}`, 'success');
+                    alert(`PDF上传成功！\n文件：${data.data.filename}\n文档块：${data.data.chunks}`);
+                } else {
+                    updateStatus(`✗ ${data.message}`, 'error');
+                }
+            } catch (error) {
+                updateStatus(`✗ 上传失败: ${error.message}`, 'error');
+            }
+            
+            // 重置文件选择
+            event.target.value = '';
+        }
+        
+        // 搜索知识库
+        async function searchKnowledge() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                updateStatus('请输入搜索关键词', 'error');
+                return;
+            }
+            
+            updateStatus('正在检索...', 'warning');
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '<div class="loading"></div>';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({query, k: 6})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const docs = data.data.documents;
+                    if (docs.length === 0) {
+                        resultsDiv.innerHTML = '<div class="empty-state"><div>😕</div><p>未找到相关结果</p></div>';
+                    } else {
+                        resultsDiv.innerHTML = docs.map((doc, i) => `
+                            <div class="result-item">
+                                <div class="title">结果 ${i + 1}</div>
+                                <div class="content">${escapeHtml(doc.content)}</div>
+                                <div class="meta">来源: ${escapeHtml(doc.source)}</div>
+                            </div>
+                        `).join('');
+                        updateStatus(`✓ 找到 ${docs.length} 个结果`, 'success');
+                    }
+                } else {
+                    resultsDiv.innerHTML = `<div class="empty-state error"><p>✗ ${data.message}</p></div>`;
+                    updateStatus(`✗ ${data.message}`, 'error');
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="empty-state error"><p>✗ 检索失败: ${error.message}</p></div>`;
+                updateStatus(`✗ 检索失败`, 'error');
+            }
+        }
+        
+        // 查看来源
+        async function viewSources() {
+            updateStatus('正在加载知识库内容...', 'warning');
+            const contentDiv = document.getElementById('sourcesContent');
+            contentDiv.innerHTML = '<div class="loading"></div>';
+            switchTab('sources');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/sources`, {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const sources = data.data;
+                    if (sources.length === 0) {
+                        contentDiv.innerHTML = '<div class="empty-state"><div>📚</div><p>知识库为空</p></div>';
+                    } else {
+                        contentDiv.innerHTML = sources.map(source => `
+                            <div class="source-item">
+                                <div class="source-info">
+                                    <div class="name">📄 ${escapeHtml(source.source)}</div>
+                                    <div class="count">文档块数量: ${source.doc_count}</div>
+                                </div>
+                                <button class="btn btn-danger" onclick="deleteSingleSource('${escapeHtml(source.source)}')">
+                                    删除
+                                </button>
+                            </div>
+                        `).join('');
+                        updateStatus(`✓ 共 ${sources.length} 个来源`, 'success');
+                    }
+                } else {
+                    contentDiv.innerHTML = `<div class="empty-state error"><p>✗ ${data.message}</p></div>`;
+                    updateStatus(`✗ ${data.message}`, 'error');
+                }
+            } catch (error) {
+                contentDiv.innerHTML = `<div class="empty-state error"><p>✗ 加载失败: ${error.message}</p></div>`;
+                updateStatus(`✗ 加载失败`, 'error');
+            }
+        }
+        
+        // 删除单个来源
+        async function deleteSingleSource(source) {
+            if (!confirm(`确定要删除来源"${source}"吗？`)) return;
+            
+            updateStatus('正在删除...', 'warning');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({source})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStatus(`✓ ${data.message}`, 'success');
+                    viewSources(); // 刷新列表
+                } else {
+                    updateStatus(`✗ ${data.message}`, 'error');
+                }
+            } catch (error) {
+                updateStatus(`✗ 删除失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 删除知识（弹出选择框）
+        function deleteKnowledge() {
+            const action = confirm('确定要清空整个知识库吗？\n点击"确定"清空全部，"取消"返回');
+            if (action) {
+                clearKnowledgeBase();
+            }
+        }
+        
+        // 清空知识库
+        async function clearKnowledgeBase() {
+            if (!confirm('此操作不可恢复！确定要清空整个知识库吗？')) return;
+            
+            updateStatus('正在清空知识库...', 'warning');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/clear`, {
+                    method: 'DELETE',
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateStatus('✓ 知识库已清空', 'success');
+                    document.getElementById('searchResults').innerHTML = '<div class="empty-state"><div>📚</div><p>知识库已清空</p></div>';
+                    document.getElementById('sourcesContent').innerHTML = '<div class="empty-state"><div>📚</div><p>知识库为空</p></div>';
+                } else {
+                    updateStatus(`✗ ${data.message}`, 'error');
+                }
+            } catch (error) {
+                updateStatus(`✗ 清空失败: ${error.message}`, 'error');
+            }
+        }
+        
+        // 切换标签页
+        function switchTab(tabName) {
+            // 切换标签按钮状态
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // 切换内容
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+        
+        // 更新状态
+        function updateStatus(message, type = 'success') {
+            const statusBar = document.getElementById('statusBar');
+            const statusText = document.getElementById('statusText');
+            
+            statusBar.textContent = message;
+            statusText.textContent = message;
+            statusBar.className = 'status-bar ' + type;
+            
+            setTimeout(() => {
+                statusBar.className = 'status-bar';
+            }, 3000);
+        }
+        
+        // HTML转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // 初始化
+        updateStatus('系统就绪 | 可上传PDF或进行知识检索');
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI论文辅助系统 - 前端示例</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-weight: 500;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .error {
+            border-left-color: #e74c3c;
+            color: #e74c3c;
+        }
+        
+        .success {
+            border-left-color: #2ecc71;
+            color: #2ecc71;
+        }
+        
+        .token-display {
+            background: #333;
+            color: #0f0;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin-top: 10px;
+        }
+        
+        .paper-list {
+            list-style: none;
+        }
+        
+        .paper-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        .paper-item:hover {
+            transform: translateX(5px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 AI论文辅助系统 - 前端示例</h1>
+        
+        <!-- 登录区域 -->
+        <div class="section">
+            <h2>1. 用户登录</h2>
+            <div class="form-group">
+                <label>用户名</label>
+                <input type="text" id="username" value="sxs" placeholder="请输入用户名">
+            </div>
+            <div class="form-group">
+                <label>密码</label>
+                <input type="password" id="password" value="123456" placeholder="请输入密码">
+            </div>
+            <button onclick="login()">登录</button>
+            <div id="loginResult" class="result" style="display:none;"></div>
+            <div id="tokenDisplay" class="token-display" style="display:none;"></div>
+        </div>
+        
+        <!-- 论文列表 -->
+        <div class="section">
+            <h2>2. 论文列表</h2>
+            <button onclick="getPapers()" id="getPapersBtn" disabled>获取论文列表</button>
+            <div id="paperResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- 知识库检索 -->
+        <div class="section">
+            <h2>3. 知识库检索</h2>
+            <div class="form-group">
+                <label>检索内容</label>
+                <input type="text" id="searchQuery" value="video streaming" placeholder="请输入检索关键词">
+            </div>
+            <button onclick="searchKnowledge()" id="searchBtn" disabled>检索</button>
+            <button onclick="openKnowledgeBase()" id="kbBtn" disabled style="margin-left:10px; background:#28a745;">
+                📚 打开知识库管理
+            </button>
+            <div id="searchResult" class="result" style="display:none;"></div>
+        </div>
+        
+        <!-- AI生成内容 -->
+        <div class="section">
+            <h2>4. AI生成内容</h2>
+            <div class="form-group">
+                <label>已有内容</label>
+                <textarea id="existingText" placeholder="请输入已有内容">Introduction
+
+This paper discusses...</textarea>
+            </div>
+            <div class="form-group">
+                <label>Prompt模板（使用$$作为占位符）</label>
+                <textarea id="promptTemplate">请将已有内容$$补全为完整段落，参考知识库内容$$</textarea>
+            </div>
+            <button onclick="generateContent()" id="generateBtn" disabled>生成内容</button>
+            <div id="generateResult" class="result" style="display:none;"></div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let token = '';
+        
+        // 登录
+        async function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('loginResult');
+            const tokenDiv = document.getElementById('tokenDisplay');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({username, password})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    token = data.data.token;
+                    resultDiv.className = 'result success';
+                    resultDiv.textContent = `✓ ${data.message}`;
+                    resultDiv.style.display = 'block';
+                    
+                    tokenDiv.textContent = `Token: ${token}`;
+                    tokenDiv.style.display = 'block';
+                    
+                    // 启用其他按钮
+                    document.getElementById('getPapersBtn').disabled = false;
+                    document.getElementById('searchBtn').disabled = false;
+                    document.getElementById('generateBtn').disabled = false;
+                    document.getElementById('kbBtn').disabled = false;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `✗ ${data.message || '登录失败'}`;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `✗ 请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+        
+        // 获取论文列表
+        async function getPapers() {
+            const resultDiv = document.getElementById('paperResult');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/papers/list`, {
+                    headers: {'Authorization': `Bearer ${token}`}
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const papers = data.data;
+                    if (papers.length === 0) {
+                        resultDiv.textContent = '暂无论文';
+                    } else {
+                        resultDiv.innerHTML = '<ul class="paper-list">' +
+                            papers.map((p, i) => 
+                                `<li class="paper-item">${i+1}. ${p.paper_title}</li>`
+                            ).join('') +
+                            '</ul>';
+                    }
+                    resultDiv.className = 'result';
+                    resultDiv.style.display = 'block';
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `✗ ${data.message}`;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `✗ 请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+        
+        // 知识库检索
+        async function searchKnowledge() {
+            const query = document.getElementById('searchQuery').value;
+            const resultDiv = document.getElementById('searchResult');
+            
+            if (!query) {
+                alert('请输入检索内容');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/knowledge/search`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({query, k: 5})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    const docs = data.data.documents;
+                    if (docs.length === 0) {
+                        resultDiv.textContent = '未找到相关内容';
+                    } else {
+                        resultDiv.innerHTML = docs.map((doc, i) => 
+                            `<div style="margin-bottom:15px;">
+                                <strong>结果 ${i+1}:</strong><br>
+                                ${doc.content.substring(0, 200)}...<br>
+                                <small style="color:#888;">来源: ${doc.source}</small>
+                            </div>`
+                        ).join('');
+                    }
+                    resultDiv.className = 'result';
+                    resultDiv.style.display = 'block';
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `✗ ${data.message}`;
+                    resultDiv.style.display = 'block';
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `✗ 请求失败: ${error.message}`;
+                resultDiv.style.display = 'block';
+            }
+        }
+        
+        // AI生成内容
+        async function generateContent() {
+            const existingText = document.getElementById('existingText').value;
+            const promptTemplate = document.getElementById('promptTemplate').value;
+            const resultDiv = document.getElementById('generateResult');
+            const btn = document.getElementById('generateBtn');
+            
+            if (!existingText || !promptTemplate) {
+                alert('请填写所有必填项');
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '生成中...';
+            resultDiv.textContent = '⏳ AI正在生成内容，请稍候...';
+            resultDiv.className = 'result';
+            resultDiv.style.display = 'block';
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/ai/generate`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        existing_text: existingText,
+                        kb_content: '',
+                        section_text: '',
+                        prompt_template: promptTemplate
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'result success';
+                    resultDiv.innerHTML = `<strong>✓ 生成成功</strong><br><br>${data.data.generated_content}`;
+                } else {
+                    resultDiv.className = 'result error';
+                    resultDiv.textContent = `✗ ${data.message}`;
+                }
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.textContent = `✗ 请求失败: ${error.message}`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '生成内容';
+            }
+        }
+        
+        // 打开知识库管理（对应原main_sxs1.py第178行和348行）
+        function openKnowledgeBase() {
+            // 保存token到localStorage供知识库页面使用
+            localStorage.setItem('token', token);
+            
+            // 打开新窗口
+            const kbWindow = window.open(
+                'frontend/knowledge_base.html',
+                'KnowledgeBase',
+                'width=1200,height=800,resizable=yes,scrollbars=yes'
+            );
+            
+            if (!kbWindow) {
+                alert('无法打开知识库窗口，请检查浏览器弹窗设置');
+            }
+        }
+    </script>
+</body>
+</html>
+

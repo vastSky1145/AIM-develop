@@ -1,0 +1,186 @@
+import time
+import pymongo
+from pymongo import MongoClient
+from models import ResearchPaper, PaperSection, Prompt_Template
+import json
+from typing import Optional
+from typing import List, Dict, Any
+import os
+
+
+class PaperDatabase:
+    def __init__(self, db_name="research_papers", collection_name: str = "papers"):
+        self.client = MongoClient('mongodb://localhost:27017/')
+        self.db = self.client[db_name]
+        self.collection=   self.db[collection_name]
+        self.papers = self.db['papers']
+        self.users = self.db['users']
+        self.prompts = self.db['prompts']
+
+    def query_papers_by_uid(self,
+            uid: int,
+            db_connection_string: str = "mongodb://localhost:27017/",
+            db_name: str = "research_papers",
+            collection_name: str = "papers",
+            output_dir: str = "output"
+    ) -> Dict[str, Any]:
+        """
+        根据UID从MongoDB查询论文，并导出为JSON文件
+
+        Args:
+            uid: 要查询的论文UID
+            db_connection_string: MongoDB连接字符串
+            db_name: 数据库名称
+            collection_name: 集合名称
+            output_dir: 输出JSON文件的目录
+
+        Returns:
+            包含处理结果的字典
+        """
+        result = {
+            "success": False,
+            "message": "",
+            "matched_count": 0,
+            "output_files": []
+        }
+
+        try:
+            # 连接MongoDB
+            client = pymongo.MongoClient(db_connection_string)
+            db = client[db_name]
+            collection = db[collection_name]
+
+            # 查询论文，排除 _id 字段
+            query = {"uid": uid}
+            projection = {"_id": 0}  # 排除 _id 字段
+            papers = list(collection.find(query, projection))
+            print("uid",uid)
+            # 检查结果
+            if not papers:
+                result["message"] = f"未找到UID为 {uid} 的论文"
+                return result
+
+            # 创建输出目录（如果不存在）
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+
+            # 处理查询结果
+            result["matched_count"] = len(papers)
+
+            result["papers"] = papers
+            # if len(papers) == 1:
+            #     # 单篇论文，直接输出
+            #     result
+            # else:
+            #     # 多篇论文，按索引输出
+            #     for i, paper in enumerate(papers):
+            #         json.dump(paper, ensure_ascii=False, indent=4)
+
+            result["success"] = True
+            return result
+
+        except Exception as e:
+            result["message"] = f"查询过程中发生错误: {str(e)}"
+            return result
+        finally:
+            # 关闭数据库连接
+            if 'client' in locals():
+                client.close()
+
+    def get_paper(self, user_id: str, paper_id: str) -> Optional[ResearchPaper]:
+        doc = self.papers.find_one({"paper_id": paper_id, "author": user_id})
+        if doc:
+            sections = {
+                name: PaperSection(**data)
+                for name, data in doc.get('sections', {}).items()
+            }
+            return ResearchPaper(
+                paper_id=doc['paper_id'],
+                title=doc.get('title', 'Untitled'),
+                author=doc['author'],
+                sections=sections,
+                current_section=doc.get('current_section')
+            )
+        return None
+
+    def save_paper(self, paper_data):
+        uid = paper_data.get("uid")
+        print("uid save ",uid)
+        print(paper_data)
+        paper_title = paper_data.get("paper_title")
+        if uid is None:
+            raise ValueError("JSON 文件中缺少 uid 字段，无法写入数据库")
+        try:
+            self.collection.update_one(
+             {"uid": uid, "paper_title": paper_title},
+             {"$set": paper_data},
+             upsert=True
+            )
+
+            return str(uid)
+
+        except Exception as e:
+            print(f"导入过程中发生错误: {e}")
+            return None
+
+        finally:
+            if 'client' in locals():
+                self.client.close()
+
+    def verify_user(self,username,password):
+        doc = self.users.find_one({"username": username})
+        print(doc)
+        if doc:
+            info = dict()
+            import bcrypt
+            # 数据库中存储的加密后的密码
+            stored_hash = doc['password_hash']
+            # 用户登录时输入的密码
+            user_input_password = password
+            # 验证密码
+            if bcrypt.checkpw(user_input_password.encode('utf-8'), stored_hash):
+                info["verify"] = True
+                info["user_info"] = doc
+                return info
+            else:
+                info["verify"] = False
+                return info
+        else:
+            # print(doc)
+            info = dict()
+            info["verify"] = False
+            return info
+
+    def get_prompt(self, ppt_id: str) -> Optional[Prompt_Template]:
+        prompt = self.prompts.find_one({"ppt_id": ppt_id})
+        if prompt:
+            return Prompt_Template(
+                ppt_id=prompt['ppt_id'],
+                prompt_json=prompt['prompt_json'],
+            )
+        return None
+
+    def delete_paper_by_title_and_uid(self, title, uid):
+        print("title",title,"uid",uid)
+        result = self.collection.delete_one({"paper_title": title, "uid": uid})
+        return result.deleted_count > 0
+
+    def save_prompt(self, prompt: Prompt_Template):
+        try:
+            self.prompts.update_one(
+                {'ppt_id': prompt.ppt_id},
+                {'$set': {
+                    'ppt_id': prompt.ppt_id,
+                    'prompt_json': prompt.prompt_json,
+                }},
+                upsert=True
+            )
+            return True
+        except:
+            return False
+
+
+if __name__ == '__main__':
+    paperDatabase = PaperDatabase()
+    info = paperDatabase.verify_user("sxs", "123456")
+    print(info)
