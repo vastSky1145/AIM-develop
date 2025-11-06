@@ -109,6 +109,46 @@
       </el-button>
       <el-button type="success" @click="handleSave">保存</el-button>
     </div>
+    
+    <!-- 评分弹窗 -->
+    <el-dialog
+      v-model="ratingDialogVisible"
+      title="内容生成评价"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="rating-content">
+        <div class="rating-item">
+          <label>请为本次生成内容评分：</label>
+          <el-rate
+            v-model="ratingForm.score"
+            :max="10"
+            show-score
+            score-template="{value} 分"
+            style="margin-top: 10px;"
+          />
+          <p class="rating-hint">1-10分，分数越高表示内容质量越好</p>
+        </div>
+        
+        <div class="rating-item">
+          <label>评价与建议（可选）：</label>
+          <el-input
+            v-model="ratingForm.comment"
+            type="textarea"
+            :rows="4"
+            placeholder="请描述您对生成内容的评价，或提出改进建议..."
+            style="margin-top: 10px;"
+          />
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="skipRating">跳过</el-button>
+          <el-button type="primary" @click="submitRating">提交评价</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -136,6 +176,7 @@ const existingText = ref('')
 // 生成内容
 const generatedContent = ref('')
 const generating = ref(false)
+const generatedId = ref('') // 本次生成的ID
 
 // 知识库内容
 const kbContent = ref('')
@@ -147,6 +188,13 @@ const endSection = ref('')
 
 // Prompt模板
 const promptTemplate = ref('')
+
+// 评分弹窗相关
+const ratingDialogVisible = ref(false)
+const ratingForm = ref({
+  score: 5,
+  comment: ''
+})
 
 // 章节选项
 const sectionOptions = computed(() => {
@@ -281,7 +329,10 @@ const handleGenerate = async () => {
     
     if (response.success) {
       generatedContent.value = response.data.generated_content
+      generatedId.value = response.data.generated_id //本次生成的id
       ElMessage.success('内容生成成功')
+      // 弹出评分弹窗
+      showRatingDialog()
     }
   } catch (error) {
     console.error('生成内容失败:', error)
@@ -314,12 +365,54 @@ const handleModify = async () => {
     
     if (response.success) {
       generatedContent.value = response.data.generated_content
+      generatedId.value = response.data.generated_id //本次生成的id
       ElMessage.success('内容修改成功')
+      // 弹出评分弹窗
+      showRatingDialog()
     }
   } catch (error) {
     console.error('修改内容失败:', error)
     ElMessage.error('修改内容失败')
   }
+}
+
+// 显示评分弹窗
+const showRatingDialog = () => {
+  // 重置评分表单
+  ratingForm.value = {
+    score: 5,
+    comment: ''
+  }
+  ratingDialogVisible.value = true
+}
+
+// 提交评分
+const submitRating = async () => {
+  if (!generatedId.value) {
+    ElMessage.warning('未找到生成记录ID')
+    return
+  }
+  
+  try {
+    const response = await aiAPI.submitRating({
+      generated_id: generatedId.value,
+      score: ratingForm.value.score,
+      comment: ratingForm.value.comment
+    })
+    
+    if (response.success) {
+      ElMessage.success('评分提交成功，感谢您的反馈！')
+      ratingDialogVisible.value = false
+    }
+  } catch (error) {
+    console.error('提交评分失败:', error)
+    ElMessage.error('提交评分失败')
+  }
+}
+
+// 跳过评分
+const skipRating = () => {
+  ratingDialogVisible.value = false
 }
 
 // 保存
@@ -377,6 +470,27 @@ onMounted(() => {
 :deep(.el-textarea__inner) {
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 13px;
+}
+
+.rating-content {
+  padding: 10px 0;
+}
+
+.rating-item {
+  margin-bottom: 20px;
+}
+
+.rating-item label {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+}
+
+.rating-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 5px;
+  margin-bottom: 0;
 }
 </style>
 

@@ -179,6 +179,29 @@ class PaperDatabase:
         except:
             return False
 
+#日志数据库
+#计划记录
+#1.LLM生成内容：包含promot模板，知识库内容，源内容，前文引用内容，生成内容
+#2.LLM修改内容：生成内容，修改意见，修改结果
+#3.用户评价内容：LLM生成内容id，用户评价，用户评分
+#总而言是，该数据记录ai生成（包含全部输入和输出），和用户评价
+class LogDatabase:
+    def __init__(self, db_name="research_papers", collection_name="logs"):
+        self.client = MongoClient('mongodb://localhost:27017/')
+        self.db = self.client[db_name]
+        self.collection = self.db[collection_name]
+
+    def save_generate_log(self, log: dict):
+        result = self.collection.insert_one(log)
+        return str(result.inserted_id)
+
+    def save_modify_log(self, log: dict):
+        result = self.collection.insert_one(log)
+        return str(result.inserted_id)
+    
+    def save_rating_log(self, log: dict):
+        result = self.collection.insert_one(log)
+        return str(result.inserted_id)
 
 if __name__ == '__main__':
     paperDatabase = PaperDatabase()

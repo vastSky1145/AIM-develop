@@ -2,14 +2,16 @@
 AI辅助写作相关路由
 """
 from fastapi import APIRouter, HTTPException, Depends
-from schemas.ai import GenerateContentRequest, ModifyContentRequest, GenerateContentResponse
+from schemas.ai import GenerateContentRequest, ModifyContentRequest, GenerateContentResponse, SubmitRatingRequest
 from schemas.common import Response
 from routers.auth import get_current_user
 from AI import llm
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from mongodb import LogDatabase
 
 router = APIRouter()
+log_database = LogDatabase()
 
 # 创建线程池执行器
 executor = ThreadPoolExecutor(max_workers=4)
@@ -80,9 +82,20 @@ async def generate_content(
             full_prompt
         )
         
+        #返回结果前,记录日志
+        log = {
+            "existing_text": request.existing_text,
+            "kb_content": request.kb_content,
+            "section_text": request.section_text,
+            "prompt_template": request.prompt_template,
+            "generated_content": generated_text,
+        }
+        log_id = log_database.save_generate_log(log)
+        
         response = GenerateContentResponse(
             generated_content=generated_text,
-            tokens_used=None  # 可以后续添加token统计
+            tokens_used=None,  # 可以后续添加token统计
+            generated_id=log_id
         )
         
         return Response(
@@ -119,10 +132,19 @@ async def modify_content(
             call_llm_sync,
             prompt
         )
+
+        #返回结果前,记录日志
+        log = {
+            "original_content": request.original_content,
+            "modification_instruction": request.modification_instruction,
+            "modified_content": modified_text,
+        }
+        log_id = log_database.save_modify_log(log)
         
         response = GenerateContentResponse(
             generated_content=modified_text,
-            tokens_used=None
+            tokens_used=None,
+            generated_id=log_id
         )
         
         return Response(
@@ -137,3 +159,29 @@ async def modify_content(
             detail=f"修改内容失败: {str(e)}"
         )
 
+@router.post("/rating", response_model=Response[bool], summary="提交用户评价和评分")
+async def submit_rating(
+    request: SubmitRatingRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    提交用户评价和评分
+    """
+    try:
+        #返回结果前,记录日志
+        log = {
+            "generated_id": request.generated_id,#用户对ai生成内容的评价，id指的是本次生成在mongodb中的id
+            "score": request.score,#用户评分
+            "comment": request.comment,#用户评价
+        }
+        log_id = log_database.save_rating_log(log)
+        return Response(
+            success=True,
+            message="用户评价和评分提交成功",
+            data=True
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"提交用户评价和评分失败: {str(e)}"
+        )

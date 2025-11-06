@@ -58,7 +58,7 @@ async def global_exception_handler(request, exc):
 async def root():
     return {
         "message": "AI论文辅助系统API",
-        "status": "运行123中"
+        "status": "运行中"
     }
 
 # 健康检查

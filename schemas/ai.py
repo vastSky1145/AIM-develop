@@ -34,8 +34,15 @@ class ModifyContentRequest(BaseModel):
             }
         }
 
+class SubmitRatingRequest(BaseModel):
+    """提交用户评价和评分请求"""
+    generated_id: str = Field(..., description="用户对ai生成内容的评价，id指的是本次生成在mongodb中的id")
+    score: int = Field(..., description="用户评分")
+    comment: str = Field(..., description="用户评价")
+
 class GenerateContentResponse(BaseModel):
     """生成内容响应"""
     generated_content: str = Field(..., description="生成的内容")
     tokens_used: Optional[int] = Field(None, description="使用的token数量")
+    generated_id: str = Field(..., description="每次生成后,都会向插入生成日志,此字段意味着mongodb插入后自动生成的id")
 

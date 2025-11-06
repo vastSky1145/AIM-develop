@@ -109,6 +109,10 @@ export const aiAPI = {
   // 修改内容
   modify(data) {
     return api.post('/ai/modify', data)
+  },
+  // 提交评分
+  submitRating(data) {
+    return api.post('/ai/rating', data)
   }
 }
 
