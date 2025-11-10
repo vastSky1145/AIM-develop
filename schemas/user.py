@@ -35,3 +35,16 @@ class LoginResponse(BaseModel):
     user_info: UserInfo = Field(..., description="用户信息")
     expires_in: int = Field(..., description="令牌有效期（秒）")
 
+class ChangePassword(BaseModel):
+    """修改密码请求"""
+    old_password: str = Field(..., min_length=6, description="旧密码")
+    new_password: str = Field(..., min_length=6, description="新密码")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "old_password": "123456",
+                "new_password": "654321"
+            }
+        }
+

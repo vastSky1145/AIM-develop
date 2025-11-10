@@ -151,6 +151,34 @@ class PaperDatabase:
             info["verify"] = False
             return info
 
+    def change_password(self, username, old_password, new_password):
+        """修改用户密码"""
+        import bcrypt
+        
+        # 首先验证旧密码
+        doc = self.users.find_one({"username": username})
+        if not doc:
+            return {"success": False, "message": "用户不存在"}
+        
+        # 验证旧密码
+        stored_hash = doc['password_hash']
+        if not bcrypt.checkpw(old_password.encode('utf-8'), stored_hash):
+            return {"success": False, "message": "旧密码错误"}
+        
+        # 生成新密码的哈希值
+        new_password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt())
+        
+        # 更新密码
+        result = self.users.update_one(
+            {"username": username},
+            {"$set": {"password_hash": new_password_hash}}
+        )
+        
+        if result.modified_count > 0:
+            return {"success": True, "message": "密码修改成功"}
+        else:
+            return {"success": False, "message": "密码修改失败"}
+
     def get_prompt(self, ppt_id: str) -> Optional[Prompt_Template]:
         prompt = self.prompts.find_one({"ppt_id": ppt_id})
         if prompt:

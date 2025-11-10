@@ -7,6 +7,9 @@
       </div>
       <div class="user-info">
         <span>用户: {{ userInfo.username }}</span>
+        <el-button type="warning" size="small" @click="handleChangePassword"
+          >修改密码</el-button
+        >
         <el-button type="danger" size="small" @click="handleLogout"
           >退出登录</el-button
         >
@@ -185,6 +188,55 @@
         @close="editDialogVisible = false"
       />
     </el-dialog>
+
+    <!-- 修改密码对话框 -->
+    <el-dialog
+      v-model="changePasswordDialogVisible"
+      title="修改密码"
+      width="400px"
+    >
+      <el-form
+        ref="passwordFormRef"
+        :model="passwordForm"
+        :rules="passwordRules"
+        label-width="100px"
+      >
+        <el-form-item label="旧密码" prop="oldPassword">
+          <el-input
+            v-model="passwordForm.oldPassword"
+            type="password"
+            placeholder="请输入旧密码"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="新密码" prop="newPassword">
+          <el-input
+            v-model="passwordForm.newPassword"
+            type="password"
+            placeholder="请输入新密码（至少6位）"
+            show-password
+          />
+        </el-form-item>
+        <el-form-item label="确认密码" prop="confirmPassword">
+          <el-input
+            v-model="passwordForm.confirmPassword"
+            type="password"
+            placeholder="请再次输入新密码"
+            show-password
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="changePasswordDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="changingPassword"
+          @click="confirmChangePassword"
+        >
+          {{ changingPassword ? "修改中..." : "确定修改" }}
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -193,7 +245,7 @@ import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { UploadFilled } from "@element-plus/icons-vue";
-import { paperAPI } from "@/api";
+import { paperAPI, authAPI } from "@/api";
 import EditNodeDialog from "@/components/EditNodeDialog.vue";
 import { parse } from "pptxtojson";
 
@@ -228,6 +280,42 @@ const uploadFile = ref(null);
 // 编辑相关
 const editDialogVisible = ref(false);
 const currentEditNode = ref(null);
+
+// 修改密码相关
+const changePasswordDialogVisible = ref(false);
+const changingPassword = ref(false);
+const passwordFormRef = ref(null);
+const passwordForm = reactive({
+  oldPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+});
+
+// 密码验证规则
+const validateConfirmPassword = (rule, value, callback) => {
+  if (value === "") {
+    callback(new Error("请再次输入新密码"));
+  } else if (value !== passwordForm.newPassword) {
+    callback(new Error("两次输入的密码不一致"));
+  } else {
+    callback();
+  }
+};
+
+const passwordRules = {
+  oldPassword: [
+    { required: true, message: "请输入旧密码", trigger: "blur" },
+    { min: 6, message: "密码至少6位", trigger: "blur" },
+  ],
+  newPassword: [
+    { required: true, message: "请输入新密码", trigger: "blur" },
+    { min: 6, message: "密码至少6位", trigger: "blur" },
+  ],
+  confirmPassword: [
+    { required: true, message: "请再次输入新密码", trigger: "blur" },
+    { validator: validateConfirmPassword, trigger: "blur" },
+  ],
+};
 
 // 加载论文列表
 const loadPapers = async () => {
@@ -463,6 +551,61 @@ const openKnowledgeBase = () => {
 const updateStatus = (text, type = "success") => {
   statusText.value = text;
   statusType.value = type;
+};
+
+// 打开修改密码对话框
+const handleChangePassword = () => {
+  // 重置表单
+  passwordForm.oldPassword = "";
+  passwordForm.newPassword = "";
+  passwordForm.confirmPassword = "";
+  changePasswordDialogVisible.value = true;
+};
+
+// 确认修改密码
+const confirmChangePassword = async () => {
+  if (!passwordFormRef.value) return;
+
+  try {
+    // 验证表单
+    await passwordFormRef.value.validate();
+
+    changingPassword.value = true;
+    updateStatus("正在修改密码...", "warning");
+
+    const response = await authAPI.changePassword({
+      old_password: passwordForm.oldPassword,
+      new_password: passwordForm.newPassword,
+    });
+
+    if (response.success) {
+      ElMessage.success("密码修改成功，请重新登录");
+      changePasswordDialogVisible.value = false;
+
+      // 清除登录信息，跳转到登录页
+      localStorage.removeItem("token");
+      localStorage.removeItem("userInfo");
+      
+      setTimeout(() => {
+        router.push("/login");
+      }, 1500);
+    } else {
+      ElMessage.error(response.message || "密码修改失败");
+      updateStatus("修改失败", "error");
+    }
+  } catch (error) {
+    if (error.detail) {
+      ElMessage.error(error.detail);
+    } else if (error instanceof Error) {
+      // 表单验证错误
+      console.log("表单验证失败:", error);
+    } else {
+      ElMessage.error("密码修改失败");
+    }
+    updateStatus("修改失败", "error");
+  } finally {
+    changingPassword.value = false;
+  }
 };
 
 // 退出登录
