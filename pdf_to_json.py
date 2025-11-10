@@ -12,9 +12,13 @@ from pygments.lexer import default
 # 默认输入输出路径(相对)
 from txt_to_json2 import parse_mmd_to_json
 
-default_input_path="E:\workflow\ppt"
-default_output_path="E:\workflow\ppt"
-default_output_dir="E:\workflow\Output"
+# default_input_path="E:\workflow\ppt"
+# default_output_path="E:\workflow\ppt"
+# default_output_dir="E:\workflow\Output"
+default_output_path=os.path.join(os.path.dirname(__file__), "workflow", "pdf")
+default_input_path=os.path.join(os.path.dirname(__file__), "workflow", "pdf")
+default_output_dir=os.path.join(os.path.dirname(__file__), "workflow", "Output")
+
 def encode_image_to_base64(image_path):
     with open(image_path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
@@ -33,7 +37,31 @@ def pdf_to_json(filepath, user_id, output_path=default_output_path):
     app_key = "sk-bzllfk7oftj7tv4he6rc7bfdz92iqtn0"
     # app_key = os.getenv("CSU_API_KEY")
     cmd = f"doc2x -k {app_key} -o {default_output_dir} --graphrag {pdf_path}"
-    subprocess.run(cmd, shell=True, check=True)
+    
+    # 临时保存当前代理设置
+    old_http_proxy = os.environ.get('http_proxy')
+    old_https_proxy = os.environ.get('https_proxy')
+    old_HTTP_PROXY = os.environ.get('HTTP_PROXY')
+    old_HTTPS_PROXY = os.environ.get('HTTPS_PROXY')
+    
+    try:
+        # doc2x 是国内服务，不需要代理，临时取消代理
+        os.environ.pop('http_proxy', None)
+        os.environ.pop('https_proxy', None)
+        os.environ.pop('HTTP_PROXY', None)
+        os.environ.pop('HTTPS_PROXY', None)
+        
+        subprocess.run(cmd, shell=True, check=True)
+    finally:
+        # 恢复代理设置
+        if old_http_proxy:
+            os.environ['http_proxy'] = old_http_proxy
+        if old_https_proxy:
+            os.environ['https_proxy'] = old_https_proxy
+        if old_HTTP_PROXY:
+            os.environ['HTTP_PROXY'] = old_HTTP_PROXY
+        if old_HTTPS_PROXY:
+            os.environ['HTTPS_PROXY'] = old_HTTPS_PROXY
     txt_dir = os.path.join(default_output_dir, filename)
     txt_filename = f"{filename}.txt"
     text_path = os.path.join(txt_dir, txt_filename)

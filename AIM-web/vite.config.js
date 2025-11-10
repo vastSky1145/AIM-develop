@@ -6,6 +6,10 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+   server: {
+    host: '0.0.0.0',
+    port: 5173 // 确保端口也是你想要的
+  },
   plugins: [
     vue(),
     vueDevTools(),

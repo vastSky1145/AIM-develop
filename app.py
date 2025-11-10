@@ -25,10 +25,30 @@ app = FastAPI(
     version="1.0.0"
 )
 
+# 允许跨域的来源列表（可以改为你的前端地址）
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://192.168.1.96:5173"  # ✅ 你的前端 IP
+
+     # 生产环境（添加这些）
+    "http://localhost",
+    "http://localhost:80",
+    "http://127.0.0.1",
+    "http://127.0.0.1:80",
+    "http://192.168.1.96",
+    "http://192.168.1.96:80",
+    "http://47.121.137.149",
+    "http://47.121.137.149:80"
+
+
+]
+
 # CORS配置 - 允许前端跨域访问
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # 生产环境应该配置具体的前端域名
+    # allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
