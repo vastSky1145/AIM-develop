@@ -3,7 +3,7 @@
 """
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from schemas.user import UserLogin, UserRegister, UserInfo, LoginResponse
+from schemas.user import UserLogin, UserRegister, UserInfo, LoginResponse, ChangePassword
 from schemas.common import Response
 from mongodb import PaperDatabase
 from utils.auth import create_access_token, verify_token
@@ -119,5 +119,37 @@ async def get_me(current_user: dict = Depends(get_current_user)):
         success=True,
         message="获取成功",
         data=user_info
+    )
+
+@router.post("/change-password", response_model=Response, summary="修改密码")
+async def change_password(
+    password_data: ChangePassword,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    修改当前用户密码
+    
+    - **old_password**: 旧密码
+    - **new_password**: 新密码（至少6个字符）
+    """
+    username = current_user.get("uid")
+    
+    # 调用数据库方法修改密码
+    result = db.change_password(
+        username=username,
+        old_password=password_data.old_password,
+        new_password=password_data.new_password
+    )
+    
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=400,
+            detail=result.get("message", "密码修改失败")
+        )
+    
+    return Response(
+        success=True,
+        message="密码修改成功",
+        data=None
     )
 
