@@ -115,6 +115,8 @@
       v-model="ratingDialogVisible"
       title="内容生成评价"
       width="500px"
+      draggable
+      overflow
       :close-on-click-modal="false"
     >
       <div class="rating-content">
