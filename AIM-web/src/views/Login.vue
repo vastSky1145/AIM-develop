@@ -49,7 +49,7 @@
       </el-form>
       
       <div class="login-footer">
-        <p>默认账号: sxs / 密码: 123456</p>
+        <p></p>
       </div>
     </div>
   </div>
@@ -67,8 +67,8 @@ const loading = ref(false)
 
 // 表单数据
 const loginForm = reactive({
-  username: 'sxs',
-  password: '123456'
+  username: '',
+  password: ''
 })
 
 // 验证规则
