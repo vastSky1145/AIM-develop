@@ -12,9 +12,12 @@ from pygments.lexer import default
 # 默认输入输出路径(相对)
 from txt_to_json2 import parse_mmd_to_json
 
-default_input_path="E:\workflow\ppt"
-default_output_path="E:\workflow\ppt"
-default_output_dir="E:\workflow\Output"
+# default_input_path="E:\workflow\ppt"
+# default_output_path="E:\workflow\ppt"
+# default_output_dir="E:\workflow\Output"
+default_output_path=os.path.join(os.path.dirname(__file__), "workflow", "pdf")
+default_input_path=os.path.join(os.path.dirname(__file__), "workflow", "pdf")
+default_output_dir=os.path.join(os.path.dirname(__file__), "workflow", "Output")
 def encode_image_to_base64(image_path):
     with open(image_path, "rb") as f:
         return base64.b64encode(f.read()).decode("utf-8")
