@@ -25,6 +25,12 @@ from collections import defaultdict
 
 router = APIRouter()
 
+# 配置 HuggingFace 镜像源，避免直接访问官方站点导致超时
+if not os.environ.get("HF_ENDPOINT") and not os.environ.get("HUGGINGFACE_HUB_BASE_URL"):
+    mirror_url = "https://hf-mirror.com"
+    os.environ["HF_ENDPOINT"] = mirror_url
+    os.environ["HUGGINGFACE_HUB_BASE_URL"] = mirror_url
+
 # 初始化向量数据库
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
