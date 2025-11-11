@@ -84,6 +84,8 @@ async def generate_content(
         
         #返回结果前,记录日志
         log = {
+            "user_id": current_user.get("uid"),#用户名
+            "u_id": current_user.get("user_id"),#用户在mongodb中的id
             "existing_text": request.existing_text,
             "kb_content": request.kb_content,
             "section_text": request.section_text,
@@ -135,6 +137,8 @@ async def modify_content(
 
         #返回结果前,记录日志
         log = {
+            "user_id": current_user.get("uid"),#用户名
+            "u_id": current_user.get("user_id"),#用户在mongodb中的id
             "original_content": request.original_content,
             "modification_instruction": request.modification_instruction,
             "modified_content": modified_text,
@@ -170,6 +174,8 @@ async def submit_rating(
     try:
         #返回结果前,记录日志
         log = {
+            "user_id": current_user.get("uid"),#用户名
+            "u_id": current_user.get("user_id"),#用户在mongodb中的id
             "generated_id": request.generated_id,#用户对ai生成内容的评价，id指的是本次生成在mongodb中的id
             "score": request.score,#用户评分
             "comment": request.comment,#用户评价

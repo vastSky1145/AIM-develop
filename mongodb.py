@@ -1,5 +1,6 @@
 import time
 import pymongo
+from bson import ObjectId
 from pymongo import MongoClient
 from models import ResearchPaper, PaperSection, Prompt_Template
 import json
@@ -230,6 +231,18 @@ class LogDatabase:
     def save_rating_log(self, log: dict):
         result = self.collection.insert_one(log)
         return str(result.inserted_id)
+
+class UserDatabase:
+    def __init__(self, db_name="research_papers", collection_name="users"):
+        self.client = MongoClient('mongodb://localhost:27017/')
+        self.db = self.client[db_name]
+        self.collection = self.db[collection_name]
+
+    def get_user_by_name(self, username: str):
+        return self.collection.find_one({"username": username})
+
+    def get_user_by_id(self, uid: str):
+        return self.collection.find_one({"_id": ObjectId(uid)})
 
 if __name__ == '__main__':
     paperDatabase = PaperDatabase()
