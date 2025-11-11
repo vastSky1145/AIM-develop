@@ -99,6 +99,7 @@ async def upload_pdf(
     - 分块存储到向量数据库
     """
     user_id = current_user.get("uid")# or current_user.get("user_id") or current_user.get("id") or current_user.get("username")
+    Original_filename = file.filename
 
     if not user_id:
         raise HTTPException(
@@ -173,7 +174,7 @@ async def upload_pdf(
         for doc in docs:
             doc.metadata["uid"] = str(user_id)
             doc.metadata["uploaded_at"] = datetime.now().isoformat()
-            doc.metadata["original_filename"] = file.filename
+            doc.metadata["original_filename"] = Original_filename + "_" + file.filename
 
         # 添加到向量数据库
         vectorstore.add_documents(docs)
