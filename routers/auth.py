@@ -44,6 +44,7 @@ async def login(user: UserLogin):
     user_info = verify_result.get("user_info")
     
     # 生成Token
+    #此处代码成屎山了，命名没命好，后期维护的时候注意两者的区别
     token_data = {
         "uid": user_info.get("username"),#用户名 username，暂时为名字缩写 如sxs
         "user_id": str(user_info.get("_id", user.username))#用户ID,存储在数据库中的_id，在数据库中为ObjectId类型
