@@ -13,7 +13,7 @@ export HUGGINGFACE_HUB_BASE_URL=https://hf-mirror.com
 echo "✓ 代理已启用"
 
 # 2. 后台启动 gunicorn(生产模式)
-GUNICORN_CMD="gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000"
+GUNICORN_CMD="gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --timeout 900"
 nohup $GUNICORN_CMD > /home/ght/aim-develop/AIM-develop/logs/backend.log 2>&1 &
 GUNICORN_PID=$!
 
