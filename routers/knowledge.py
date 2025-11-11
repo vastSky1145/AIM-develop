@@ -221,10 +221,11 @@ async def get_sources(current_user: dict = Depends(get_current_user)):
         for doc in all_docs:
             if 'source' in doc:
                 source_dict[doc['source']] += 1
-        
+            if 'original_filename' in doc:
+                source_dict[doc['original_filename']] = doc['original_filename']
         sources = [
-            KnowledgeSource(source=source, doc_count=count)
-            for source, count in source_dict.items()
+            KnowledgeSource(source=source, doc_count=count, original_filename=original_filename)
+            for source, count, original_filename in source_dict.items()
         ]
         
         return Response(
