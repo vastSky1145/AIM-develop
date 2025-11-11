@@ -99,7 +99,7 @@ async def upload_pdf(
     - 分块存储到向量数据库
     """
     user_id = current_user.get("uid")# or current_user.get("user_id") or current_user.get("id") or current_user.get("username")
-    Original_filename = file.filename
+    original_filename = os.path.basename(file.filename)
 
     if not user_id:
         raise HTTPException(
@@ -124,7 +124,9 @@ async def upload_pdf(
     # 检查是否已存在
     try:
         collection = vectorstore._collection
-        existing = collection.get(where={"source": file.filename}, limit=1)
+        existing = collection.get(where={"source": original_filename}, limit=1)
+        if len(existing['ids']) == 0:
+            existing = collection.get(where={"original_filename": original_filename,"uid": user_id}, limit=1)
         if len(existing['ids']) > 0:
             raise HTTPException(
                 status_code=400,
@@ -133,48 +135,64 @@ async def upload_pdf(
     except Exception as e:
         pass
 
-    try:
-        # 保存临时文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
-            content = await file.read()
-            tmp_file.write(content)
-            print(f"tmp_file: {tmp_file.name}")
-            tmp_file_path = tmp_file.name
-            print(f"tmp_file_path: {tmp_file_path}")
+    temp_dir = None
+    tmp_file_path = None
 
-        # 使用doc2x解析PDF
+    try:
+        # 保存临时文件，文件名保持与原始上传文件一致
+        temp_dir = tempfile.mkdtemp()
+        tmp_file_path = os.path.join(temp_dir, original_filename)
+        content = await file.read()
+        with open(tmp_file_path, 'wb') as tmp_file:
+            tmp_file.write(content)
+        print(f"tmp_file_path: {tmp_file_path}")
+
+        # 使用 doc2x 解析 PDF
         app_key = "sk-bzllfk7oftj7tv4he6rc7bfdz92iqtn0"
-        cmd = f"doc2x -k {app_key} --graphrag {tmp_file_path}"
+        cmd = f'doc2x -k {app_key} --graphrag "{tmp_file_path}"'
         subprocess.run(cmd, shell=True, check=True)
 
-        # 读取解析结果
-        cc = Path(tmp_file_path).name.rstrip('pdf')
-        co = Path(cc).name.rstrip('.')
-        output_txt = f"./Output/{co}/{co}.txt"
+        file_stem = Path(original_filename).stem
+        output_dir = Path("./Output") / file_stem
+        output_txt = output_dir / f"{file_stem}.txt"
         print(f"output_txt: {output_txt}")
-        with open(output_txt, 'r', encoding='utf-8') as f:
-            raw_content = f.read()
-        #删除output_txt文件
-        if os.path.exists(output_txt):
-            os.remove(output_txt)
+
+        if not output_txt.exists():
+            raise FileNotFoundError(f"解析结果未找到：{output_txt}")
+
+        raw_content = output_txt.read_text(encoding='utf-8')
+
+        # 删除 doc2x 生成的原始文本，后续仅保留过滤后内容
+        try:
+            output_txt.unlink()
+        except FileNotFoundError:
+            pass
 
         # 过滤内容
         pure_content = filter_paper_content(raw_content)
 
         # 保存过滤后的内容
-        filtered_txt = f"{co}.txt"
-        with open(filtered_txt, 'w', encoding='utf-8') as f:
-            f.write(pure_content)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filtered_txt = output_dir / f"{file_stem}_filtered.txt"
+        filtered_txt.write_text(pure_content, encoding='utf-8')
 
         # 加载并分割文档
-        loader = TextLoader(filtered_txt, encoding="UTF-8")
+        loader = TextLoader(str(filtered_txt), encoding="UTF-8")
         documents = loader.load()
         docs = text_splitter.split_documents(documents)
 
-        for doc in docs:
+        storage_path = str(filtered_txt)
+        output_dir_path = str(output_dir)
+        uploaded_at = datetime.now().isoformat()
+
+        for index, doc in enumerate(docs):
             doc.metadata["uid"] = str(user_id)
-            doc.metadata["uploaded_at"] = datetime.now().isoformat()
-            doc.metadata["original_filename"] = Original_filename + "_" + file.filename
+            doc.metadata["uploaded_at"] = uploaded_at
+            doc.metadata["original_filename"] = original_filename
+            doc.metadata["source"] = original_filename
+            doc.metadata["storage_path"] = storage_path
+            doc.metadata["output_dir"] = output_dir_path
+            doc.metadata["chunk_index"] = index
 
         # 添加到向量数据库
         vectorstore.add_documents(docs)
@@ -196,8 +214,10 @@ async def upload_pdf(
         )
     finally:
         # 清理临时文件
-        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
+        if 'tmp_file_path' in locals() and tmp_file_path and os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path)
+        if 'temp_dir' in locals() and temp_dir and os.path.isdir(temp_dir):
+            shutil.rmtree(temp_dir, ignore_errors=True)
 
 @router.get("/sources", response_model=Response[List[KnowledgeSource]], summary="获取知识来源列表")
 async def get_sources(current_user: dict = Depends(get_current_user)):
@@ -257,23 +277,44 @@ async def delete_knowledge(
                 detail=f"未找到来源为'{request.source}'的文档"
             )
         
+        metadatas = result.get('metadatas', []) or []
+        output_dirs = {meta.get("output_dir") for meta in metadatas if meta.get("output_dir")}
+        storage_paths = {meta.get("storage_path") for meta in metadatas if meta.get("storage_path")}
+
         # 删除向量数据库中的文档
         collection.delete(ids=result['ids'])
         
         # 删除相关文件
         deleted_files = []
-        cc = Path(request.source).name.rstrip('pdf')
-        co = Path(cc).name.rstrip('.')
-        output_dir = f"./Output/{co}"
-        
-        if os.path.exists(output_dir):
-            shutil.rmtree(output_dir)
-            deleted_files.append(output_dir)
-        
-        txt_file = request.source
-        if os.path.exists(txt_file):
-            os.remove(txt_file)
-            deleted_files.append(txt_file)
+
+        for path in storage_paths:
+            if path and os.path.exists(path):
+                os.remove(path)
+                deleted_files.append(path)
+
+        source_stem = Path(request.source).stem
+
+        if not storage_paths:
+            fallback_filtered = Path("./Output") / source_stem / f"{source_stem}_filtered.txt"
+            if fallback_filtered.exists():
+                fallback_filtered.unlink()
+                deleted_files.append(str(fallback_filtered))
+
+            legacy_txt = Path(request.source)
+            if legacy_txt.exists():
+                legacy_txt.unlink()
+                deleted_files.append(str(legacy_txt))
+
+        for directory in output_dirs:
+            if directory and os.path.exists(directory):
+                shutil.rmtree(directory)
+                deleted_files.append(directory)
+
+        if not output_dirs:
+            fallback_dir = Path("./Output") / source_stem
+            if fallback_dir.exists():
+                shutil.rmtree(fallback_dir)
+                deleted_files.append(str(fallback_dir))
         
         return Response(
             success=True,
