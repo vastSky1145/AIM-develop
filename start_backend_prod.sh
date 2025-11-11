@@ -3,10 +3,12 @@
 echo "正在启动后端服务..."
 
 # 1. 设置代理环境变量
-export http_proxy=http://127.0.0.1:7890
-export https_proxy=http://127.0.0.1:7890
-export HTTP_PROXY=http://127.0.0.1:7890
-export HTTPS_PROXY=http://127.0.0.1:7890
+# export http_proxy=http://127.0.0.1:7890
+# export https_proxy=http://127.0.0.1:7890
+# export HTTP_PROXY=http://127.0.0.1:7890
+# export HTTPS_PROXY=http://127.0.0.1:7890
+export HF_ENDPOINT=https://hf-mirror.com
+export HUGGINGFACE_HUB_BASE_URL=https://hf-mirror.com
 
 echo "✓ 代理已启用"
 
@@ -28,10 +30,10 @@ for i in {1..30}; do
 done
 
 # 4. 取消代理环境变量
-unset http_proxy
-unset https_proxy
-unset HTTP_PROXY
-unset HTTPS_PROXY
+# unset http_proxy
+# unset https_proxy
+# unset HTTP_PROXY
+# unset HTTPS_PROXY
 
 echo "✓ 代理已取消"
 echo ""
