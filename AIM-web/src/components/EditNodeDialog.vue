@@ -285,30 +285,62 @@ const extractReference = () => {
     return
   }
   
-  // 这里简化处理，实际应该递归提取
-  const findSection = (sections, id) => {
-    for (const section of sections) {
-      if (section.id === id) return section
-      if (section.children) {
-        const found = findSection(section.children, id)
-        if (found) return found
+  // 使用 DFS 提取从起始到结束节点的所有内容（包括中间节点）
+  const collected = []
+  let foundStart = false
+  
+  const dfs = (section) => {
+    const sid = section.id || ''
+    
+    // 找到起始节点
+    if (sid === startSection.value) {
+      foundStart = true
+    }
+    
+    // 如果已找到起始节点，开始收集
+    if (foundStart) {
+      collected.push(section)
+    }
+    
+    // 如果到达结束节点，返回 true 停止搜索
+    if (sid === endSection.value) {
+      return true
+    }
+    
+    // 递归搜索子节点
+    if (section.children && section.children.length > 0) {
+      for (const child of section.children) {
+        if (dfs(child)) {
+          return true
+        }
       }
     }
-    return null
+    
+    return false
   }
   
-  const startSec = findSection(props.paperSections, startSection.value)
-  const endSec = findSection(props.paperSections, endSection.value)
-  
-  if (startSec && endSec) {
-    let text = `${startSec.title}\n${startSec.content || ''}\n\n`
-    if (startSection.value !== endSection.value) {
-      text += `${endSec.title}\n${endSec.content || ''}`
+  // 遍历所有顶层节点
+  for (const section of props.paperSections) {
+    if (dfs(section)) {
+      break
     }
-    sectionText.value = text
-    ElMessage.success('参考文字提取成功')
+  }
+  
+  // 构建提取的文本
+  if (collected.length > 0) {
+    let text = ''
+    for (const sec of collected) {
+      text += `${sec.title}\n`
+      if (sec.content) {
+        text += `${sec.content}\n\n`
+      } else {
+        text += '\n'
+      }
+    }
+    sectionText.value = text.trim()
+    ElMessage.success(`参考文字提取成功，共提取 ${collected.length} 个节点`)
   } else {
-    ElMessage.error('提取失败')
+    ElMessage.error('提取失败，未找到指定的目录范围')
   }
 }
 
