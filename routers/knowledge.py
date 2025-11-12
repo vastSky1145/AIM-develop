@@ -34,7 +34,7 @@ if not os.environ.get("HF_ENDPOINT") and not os.environ.get("HUGGINGFACE_HUB_BAS
 # 初始化向量数据库
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=1)
+text_splitter = CharacterTextSplitter(chunk_size=800, chunk_overlap=150)
 
 @router.post("/search", response_model=Response[KnowledgeSearchResponse], summary="检索知识库")
 async def search_knowledge(
