@@ -7,6 +7,7 @@ import json
 from typing import Optional
 from typing import List, Dict, Any
 import os
+from datetime import datetime
 
 
 class PaperDatabase:
@@ -243,6 +244,210 @@ class UserDatabase:
 
     def get_user_by_id(self, uid: str):
         return self.collection.find_one({"_id": ObjectId(uid)})
+
+# Prompt收藏夹和模板管理数据库
+class PromptFolderDatabase:
+    def __init__(self, db_name="research_papers"):
+        self.client = MongoClient('mongodb://localhost:27017/')
+        self.db = self.client[db_name]
+        self.folders = self.db['prompt_folders']
+        self.user_prompts = self.db['user_prompts']
+    
+    # ============ 收藏夹操作 ============
+    
+    def create_folder(self, user_id: str, folder_name: str, description: Optional[str] = None) -> Optional[str]:
+        """创建收藏夹"""
+        try:
+            folder_doc = {
+                "user_id": user_id,
+                "folder_name": folder_name,
+                "description": description,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now()
+            }
+            result = self.folders.insert_one(folder_doc)
+            return str(result.inserted_id)
+        except Exception as e:
+            print(f"创建收藏夹失败: {e}")
+            return None
+    
+    def get_user_folders(self, user_id: str) -> List[Dict[str, Any]]:
+        """获取用户的所有收藏夹"""
+        try:
+            folders = list(self.folders.find({"user_id": user_id}).sort("created_at", -1))
+            
+            # 为每个收藏夹计算prompt数量
+            for folder in folders:
+                folder['id'] = str(folder['_id'])
+                del folder['_id']
+                # 统计该收藏夹下的prompt数量
+                prompt_count = self.user_prompts.count_documents({"folder_id": folder['id']})
+                folder['prompt_count'] = prompt_count
+            
+            return folders
+        except Exception as e:
+            print(f"获取收藏夹列表失败: {e}")
+            return []
+    
+    def get_folder_by_id(self, folder_id: str) -> Optional[Dict[str, Any]]:
+        """根据ID获取收藏夹"""
+        try:
+            folder = self.folders.find_one({"_id": ObjectId(folder_id)})
+            if folder:
+                folder['id'] = str(folder['_id'])
+                del folder['_id']
+                # 统计prompt数量
+                prompt_count = self.user_prompts.count_documents({"folder_id": folder['id']})
+                folder['prompt_count'] = prompt_count
+            return folder
+        except Exception as e:
+            print(f"获取收藏夹失败: {e}")
+            return None
+    
+    def update_folder(self, folder_id: str, user_id: str, folder_name: Optional[str] = None, 
+                     description: Optional[str] = None) -> bool:
+        """更新收藏夹"""
+        try:
+            update_data = {"updated_at": datetime.now()}
+            if folder_name is not None:
+                update_data["folder_name"] = folder_name
+            if description is not None:
+                update_data["description"] = description
+            
+            result = self.folders.update_one(
+                {"_id": ObjectId(folder_id), "user_id": user_id},
+                {"$set": update_data}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"更新收藏夹失败: {e}")
+            return False
+    
+    def delete_folder(self, folder_id: str, user_id: str) -> bool:
+        """删除收藏夹（同时删除其下的所有prompts）"""
+        try:
+            # 先删除该收藏夹下的所有prompts
+            self.user_prompts.delete_many({"folder_id": folder_id, "user_id": user_id})
+            
+            # 删除收藏夹
+            result = self.folders.delete_one({"_id": ObjectId(folder_id), "user_id": user_id})
+            return result.deleted_count > 0
+        except Exception as e:
+            print(f"删除收藏夹失败: {e}")
+            return False
+    
+    # ============ Prompt操作 ============
+    
+    def create_prompt(self, user_id: str, folder_id: str, prompt_name: str, 
+                     prompt_content: str, description: Optional[str] = None, 
+                     tags: Optional[List[str]] = None) -> Optional[str]:
+        """创建Prompt"""
+        try:
+            prompt_doc = {
+                "user_id": user_id,
+                "folder_id": folder_id,
+                "prompt_name": prompt_name,
+                "prompt_content": prompt_content,
+                "description": description,
+                "tags": tags if tags else [],
+                "created_at": datetime.now(),
+                "updated_at": datetime.now()
+            }
+            result = self.user_prompts.insert_one(prompt_doc)
+            return str(result.inserted_id)
+        except Exception as e:
+            print(f"创建Prompt失败: {e}")
+            return None
+    
+    def get_prompts_by_folder(self, folder_id: str, user_id: str) -> List[Dict[str, Any]]:
+        """获取指定收藏夹下的所有prompts"""
+        try:
+            prompts = list(self.user_prompts.find({
+                "folder_id": folder_id,
+                "user_id": user_id
+            }).sort("created_at", -1))
+            
+            for prompt in prompts:
+                prompt['id'] = str(prompt['_id'])
+                del prompt['_id']
+            
+            return prompts
+        except Exception as e:
+            print(f"获取Prompt列表失败: {e}")
+            return []
+    
+    def get_prompt_by_id(self, prompt_id: str) -> Optional[Dict[str, Any]]:
+        """根据ID获取Prompt"""
+        try:
+            prompt = self.user_prompts.find_one({"_id": ObjectId(prompt_id)})
+            if prompt:
+                prompt['id'] = str(prompt['_id'])
+                del prompt['_id']
+            return prompt
+        except Exception as e:
+            print(f"获取Prompt失败: {e}")
+            return None
+    
+    def update_prompt(self, prompt_id: str, user_id: str, folder_id: Optional[str] = None,
+                     prompt_name: Optional[str] = None, prompt_content: Optional[str] = None,
+                     description: Optional[str] = None, tags: Optional[List[str]] = None) -> bool:
+        """更新Prompt"""
+        try:
+            update_data = {"updated_at": datetime.now()}
+            if folder_id is not None:
+                update_data["folder_id"] = folder_id
+            if prompt_name is not None:
+                update_data["prompt_name"] = prompt_name
+            if prompt_content is not None:
+                update_data["prompt_content"] = prompt_content
+            if description is not None:
+                update_data["description"] = description
+            if tags is not None:
+                update_data["tags"] = tags
+            
+            result = self.user_prompts.update_one(
+                {"_id": ObjectId(prompt_id), "user_id": user_id},
+                {"$set": update_data}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            print(f"更新Prompt失败: {e}")
+            return False
+    
+    def delete_prompt(self, prompt_id: str, user_id: str) -> bool:
+        """删除Prompt"""
+        try:
+            result = self.user_prompts.delete_one({
+                "_id": ObjectId(prompt_id),
+                "user_id": user_id
+            })
+            return result.deleted_count > 0
+        except Exception as e:
+            print(f"删除Prompt失败: {e}")
+            return False
+    
+    def search_prompts(self, user_id: str, keyword: str) -> List[Dict[str, Any]]:
+        """搜索Prompts（按名称和描述）"""
+        try:
+            # 使用正则表达式进行模糊搜索
+            regex_pattern = {"$regex": keyword, "$options": "i"}
+            prompts = list(self.user_prompts.find({
+                "user_id": user_id,
+                "$or": [
+                    {"prompt_name": regex_pattern},
+                    {"description": regex_pattern},
+                    {"tags": regex_pattern}
+                ]
+            }).sort("created_at", -1))
+            
+            for prompt in prompts:
+                prompt['id'] = str(prompt['_id'])
+                del prompt['_id']
+            
+            return prompts
+        except Exception as e:
+            print(f"搜索Prompt失败: {e}")
+            return []
 
 if __name__ == '__main__':
     paperDatabase = PaperDatabase()

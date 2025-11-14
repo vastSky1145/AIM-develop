@@ -17,6 +17,12 @@ const routes = [
     name: 'KnowledgeBase',
     component: () => import('./views/KnowledgeBase.vue'),
     meta: { requiresAuth: true }
+  },
+  {
+    path: '/prompt-manage',
+    name: 'PromptManage',
+    component: () => import('./views/PromptManage.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

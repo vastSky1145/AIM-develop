@@ -163,5 +163,39 @@ export const promptAPI = {
   }
 }
 
+// 用户Prompt管理相关
+export const userPromptAPI = {
+  // 收藏夹相关
+  getFolders() {
+    return api.get('/user-prompts/folders')
+  },
+  createFolder(data) {
+    return api.post('/user-prompts/folders', data)
+  },
+  updateFolder(folderId, data) {
+    return api.put(`/user-prompts/folders/${folderId}`, data)
+  },
+  deleteFolder(folderId) {
+    return api.delete(`/user-prompts/folders/${folderId}`)
+  },
+  
+  // Prompts相关
+  getPromptsByFolder(folderId) {
+    return api.get(`/user-prompts/list?folder_id=${folderId}`)
+  },
+  createPrompt(data) {
+    return api.post('/user-prompts/create', data)
+  },
+  updatePrompt(promptId, data) {
+    return api.put(`/user-prompts/update/${promptId}`, data)
+  },
+  deletePrompt(promptId) {
+    return api.delete(`/user-prompts/delete/${promptId}`)
+  },
+  searchPrompts(keyword) {
+    return api.get(`/user-prompts/search?keyword=${encodeURIComponent(keyword)}`)
+  }
+}
+
 export default api
 
