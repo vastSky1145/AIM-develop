@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 import jwt
 
 # 导入路由
-from routers import auth, papers, ai_assistant, knowledge, prompts
+from routers import auth, papers, ai_assistant, knowledge, prompts, user_prompts
 
 # 设置环境变量（避免TensorFlow警告）
 os.environ["TRANSFORMERS_NO_TF"] = "1"
@@ -40,6 +40,7 @@ app.include_router(papers.router, prefix="/api/papers", tags=["论文管理"])
 app.include_router(ai_assistant.router, prefix="/api/ai", tags=["AI辅助"])
 app.include_router(knowledge.router, prefix="/api/knowledge", tags=["知识库"])
 app.include_router(prompts.router, prefix="/api/prompts", tags=["Prompt模板"])
+app.include_router(user_prompts.router, prefix="/api/user-prompts", tags=["用户Prompt管理"])
 
 # 全局异常处理器
 @app.exception_handler(Exception)

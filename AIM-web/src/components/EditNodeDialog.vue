@@ -89,11 +89,43 @@
       <el-col :span="6">
         <div class="section">
           <h3>Prompt 模板</h3>
+          
+          <!-- 新增：收藏夹选择 -->
+          <el-select 
+            v-model="selectedFolder" 
+            placeholder="选择收藏夹"
+            @change="handleFolderChange"
+            clearable
+            style="width: 100%; margin-bottom: 10px;">
+            <el-option
+              v-for="folder in folders"
+              :key="folder.id"
+              :label="folder.folder_name"
+              :value="folder.id"
+            />
+          </el-select>
+          
+          <!-- 新增：Prompt选择 -->
+          <el-select 
+            v-model="selectedPrompt" 
+            placeholder="选择Prompt模板"
+            @change="handlePromptChange"
+            clearable
+            :disabled="!selectedFolder"
+            style="width: 100%; margin-bottom: 10px;">
+            <el-option
+              v-for="prompt in folderPrompts"
+              :key="prompt.id"
+              :label="prompt.prompt_name"
+              :value="prompt.id"
+            />
+          </el-select>
+          
           <p class="hint">已有内容和知识库内容用$$占位</p>
           <el-input
             v-model="promptTemplate"
             type="textarea"
-            :rows="25"
+            :rows="20"
             placeholder="输入Prompt模板..."
           />
         </div>
@@ -157,7 +189,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { aiAPI, knowledgeAPI, promptAPI } from '@/api'
+import { aiAPI, knowledgeAPI, promptAPI, userPromptAPI } from '@/api'
 
 const props = defineProps({
   nodeData: {
@@ -190,6 +222,12 @@ const endSection = ref('')
 
 // Prompt模板
 const promptTemplate = ref('')
+
+// 用户Prompt管理
+const folders = ref([])
+const selectedFolder = ref('')
+const folderPrompts = ref([])
+const selectedPrompt = ref('')
 
 // 评分弹窗相关
 const ratingDialogVisible = ref(false)
@@ -246,6 +284,51 @@ $$。
 写作逻辑要和以下章节的逻辑内容呼应
 $$。
 补全段落时要求生成的内容是对已有内容的补充，不改变已有内容的目录结构，可以适当对已有内容的句子扩充，但要保证句子之间逻辑结构和原来一致，扩充内容不要超过1句。知识库中的知识只能作为参考，总结归纳其中语义相关的知识作为参照，而不是直接引用。知识库中出现的图表，若已有内容中没有，则认为该知识不相关，不能作为参考。生成内容和知识库中的原句不可以一样。 latex公式不要编译。要求英文撰写。凝练成逻辑严密的一段话。不要目录结构，不要出现目录编号。生成的文字中要包括已有内容里对图或者表的引用。要求语言风格比较学术化。`
+  }
+}
+
+// 加载用户收藏夹列表
+const loadUserFolders = async () => {
+  try {
+    const response = await userPromptAPI.getFolders()
+    if (response.success) {
+      folders.value = response.data || []
+    }
+  } catch (error) {
+    console.error('加载收藏夹列表失败:', error)
+  }
+}
+
+// 收藏夹选择变化
+const handleFolderChange = async (folderId) => {
+  if (!folderId) {
+    folderPrompts.value = []
+    selectedPrompt.value = ''
+    return
+  }
+  
+  try {
+    const response = await userPromptAPI.getPromptsByFolder(folderId)
+    if (response.success) {
+      folderPrompts.value = response.data || []
+      selectedPrompt.value = ''
+    }
+  } catch (error) {
+    console.error('加载Prompt列表失败:', error)
+    ElMessage.error('加载Prompt列表失败')
+  }
+}
+
+// Prompt选择变化
+const handlePromptChange = (promptId) => {
+  if (!promptId) {
+    return
+  }
+  
+  const selectedPromptData = folderPrompts.value.find(p => p.id === promptId)
+  if (selectedPromptData) {
+    promptTemplate.value = selectedPromptData.prompt_content
+    ElMessage.success('已加载Prompt模板')
   }
 }
 
@@ -466,6 +549,7 @@ const handleSave = () => {
 onMounted(() => {
   initExistingText()
   loadPromptTemplate()
+  loadUserFolders()
 })
 </script>
 

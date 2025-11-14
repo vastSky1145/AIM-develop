@@ -67,6 +67,14 @@
             提交知识
           </el-button>
           <el-button
+            type="info"
+            size="small"
+            @click="openPromptManage"
+            style="width: 100%; margin-bottom: 8px"
+          >
+            Prompt管理
+          </el-button>
+          <el-button
             type="primary"
             size="small"
             @click="handleUploadPPT"
@@ -545,6 +553,11 @@ const handleSaveNode = async (updatedNode) => {
 // 打开知识库
 const openKnowledgeBase = () => {
   router.push("/knowledge");
+};
+
+// 打开Prompt管理
+const openPromptManage = () => {
+  router.push("/prompt-manage");
 };
 
 // 更新状态
