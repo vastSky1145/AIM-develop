@@ -22,13 +22,28 @@
             v-for="folder in folders"
             :key="folder.id"
             :class="['folder-item', { active: selectedFolderId === folder.id }]"
-            @click="selectFolder(folder)"
             @contextmenu.prevent="handleFolderRightClick($event, folder)"
           >
-            <div class="folder-info">
+            <div class="folder-info" @click="selectFolder(folder)">
               <el-icon><Folder /></el-icon>
               <span class="folder-name">{{ folder.folder_name }}</span>
               <el-tag size="small" type="info">{{ folder.prompt_count }}</el-tag>
+            </div>
+            <div class="folder-actions">
+              <el-button
+                type="text"
+                size="small"
+                :icon="Edit"
+                @click.stop="showEditFolderDialog(folder)"
+                title="编辑收藏夹"
+              />
+              <el-button
+                type="text"
+                size="small"
+                :icon="Delete"
+                @click.stop="deleteFolderConfirm(folder)"
+                title="删除收藏夹"
+              />
             </div>
           </div>
           
@@ -227,7 +242,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Folder } from '@element-plus/icons-vue'
+import { Search, Plus, Folder, Edit, Delete } from '@element-plus/icons-vue'
 import { userPromptAPI } from '@/api'
 import { useRouter } from 'vue-router'
 
@@ -639,8 +654,10 @@ onMounted(() => {
   padding: 12px 15px;
   margin-bottom: 5px;
   border-radius: 6px;
-  cursor: pointer;
   transition: all 0.3s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .folder-item:hover {
@@ -656,6 +673,18 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex: 1;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.folder-actions {
+  display: none;
+  gap: 4px;
+}
+
+.folder-item:hover .folder-actions {
+  display: flex;
 }
 
 .folder-name {
