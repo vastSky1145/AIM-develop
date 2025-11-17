@@ -71,13 +71,15 @@ class PromptUpdate(BaseModel):
     prompt_content: Optional[str] = Field(None, description="Prompt内容", min_length=1)
     description: Optional[str] = Field(None, description="Prompt描述", max_length=500)
     tags: Optional[List[str]] = Field(None, description="标签列表")
+    change_description: str = Field(..., description="修改描述（必填）", min_length=1, max_length=200)
     
     class Config:
         json_schema_extra = {
             "example": {
                 "prompt_name": "论文引言生成（更新）",
                 "prompt_content": "更新后的Prompt内容...",
-                "tags": ["引言", "学术", "优化"]
+                "tags": ["引言", "学术", "优化"],
+                "change_description": "优化了引言部分的逻辑结构"
             }
         }
 
@@ -92,6 +94,23 @@ class PromptResponse(BaseModel):
     tags: List[str] = Field(default_factory=list, description="标签列表")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="更新时间")
+    current_version: int = Field(1, description="当前版本号")
+
+# ============ 版本历史相关模型 ============
+
+class PromptVersionResponse(BaseModel):
+    """Prompt版本历史响应"""
+    id: str = Field(..., description="版本记录ID")
+    prompt_id: str = Field(..., description="关联的Prompt ID")
+    version: int = Field(..., description="版本号")
+    user_id: str = Field(..., description="用户ID")
+    folder_id: str = Field(..., description="所属收藏夹ID")
+    prompt_name: str = Field(..., description="Prompt名称（快照）")
+    prompt_content: str = Field(..., description="Prompt内容（完整快照）")
+    description: Optional[str] = Field(None, description="Prompt描述（快照）")
+    tags: List[str] = Field(default_factory=list, description="标签（快照）")
+    change_description: str = Field(..., description="本次修改说明")
+    created_at: datetime = Field(..., description="创建时间")
 
 # ============ 组合模型 ============
 

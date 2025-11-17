@@ -2,7 +2,7 @@
   <div class="prompt-manage">
     <!-- 头部 -->
     <div class="pm-header">
-      <h1>📝 Prompt模板管理</h1>
+      <h1>Prompt模板管理</h1>
       <el-button type="primary" @click="$router.push('/')">返回主页</el-button>
     </div>
     
@@ -60,7 +60,7 @@
             v-model="searchKeyword"
             placeholder="搜索Prompt..."
             clearable
-            style="width: 300px;"
+            style="width: 300px;visibility: hidden;"
             @keyup.enter="handleSearch"
           >
             <template #append>
@@ -119,9 +119,20 @@
                   {{ tag }}
                 </el-tag>
               </div>
-              <span class="prompt-time">
-                {{ formatTime(prompt.updated_at) }}
-              </span>
+              <div class="footer-right">
+                <el-tag size="small" type="warning">v{{ prompt.current_version || 1 }}</el-tag>
+                <el-button
+                  type="text"
+                  size="small"
+                  @click="showVersionHistory(prompt)"
+                  style="margin-left: 8px;"
+                >
+                  查看历史
+                </el-button>
+                <span class="prompt-time">
+                  {{ formatTime(prompt.updated_at) }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -195,6 +206,14 @@
           />
         </el-form-item>
         
+        <el-form-item label="修改描述" required v-if="isEditPrompt">
+          <el-input
+            v-model="promptForm.change_description"
+            placeholder="请描述本次修改的内容和原因（必填）"
+            show-word-limit
+          />
+        </el-form-item>
+        
         <el-form-item label="标签">
           <el-select
             v-model="promptForm.tags"
@@ -221,6 +240,68 @@
       </template>
     </el-dialog>
     
+    <!-- 版本历史对话框 -->
+    <el-dialog
+      v-model="versionHistoryVisible"
+      title="版本历史"
+      width="900px"
+      :close-on-click-modal="false"
+    >
+      <div v-if="loadingVersions" style="text-align: center; padding: 40px;">
+        <el-icon class="is-loading" size="32"><Loading /></el-icon>
+        <p>加载版本历史中...</p>
+      </div>
+      
+      <el-timeline v-else-if="versions.length > 0">
+        <el-timeline-item
+          v-for="version in versions"
+          :key="version.id"
+          :timestamp="formatTime(version.created_at)"
+          placement="top"
+        >
+          <el-card>
+            <div class="version-header">
+              <el-tag type="warning" size="large">版本 {{ version.version }}</el-tag>
+              <span class="version-change">{{ version.change_description }}</span>
+            </div>
+            
+            <div class="version-content">
+              <div class="version-field">
+                <label>名称：</label>
+                <span>{{ version.prompt_name }}</span>
+              </div>
+              
+              <div class="version-field" v-if="version.description">
+                <label>描述：</label>
+                <span>{{ version.description }}</span>
+              </div>
+              
+              <div class="version-field">
+                <label>标签：</label>
+                <el-tag
+                  v-for="tag in version.tags"
+                  :key="tag"
+                  size="small"
+                  type="success"
+                  style="margin-right: 5px;"
+                >
+                  {{ tag }}
+                </el-tag>
+                <span v-if="!version.tags || version.tags.length === 0" class="empty-text">无</span>
+              </div>
+              
+              <div class="version-field">
+                <label>内容：</label>
+                <pre class="version-content-text">{{ version.prompt_content }}</pre>
+              </div>
+            </div>
+          </el-card>
+        </el-timeline-item>
+      </el-timeline>
+      
+      <el-empty v-else description="暂无版本历史" />
+    </el-dialog>
+    
     <!-- 收藏夹右键菜单 -->
     <el-dropdown
       trigger="contextmenu"
@@ -242,7 +323,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Folder, Edit, Delete } from '@element-plus/icons-vue'
+import { Search, Plus, Folder, Edit, Delete, Loading } from '@element-plus/icons-vue'
 import { userPromptAPI } from '@/api'
 import { useRouter } from 'vue-router'
 
@@ -272,11 +353,18 @@ const promptForm = ref({
   prompt_name: '',
   prompt_content: '',
   description: '',
-  tags: []
+  tags: [],
+  change_description: ''
 })
 
 // 常用标签
 const commonTags = ref(['学术写作', '引言', '方法', '结论', '讨论', '综述'])
+
+// 版本历史
+const versionHistoryVisible = ref(false)
+const loadingVersions = ref(false)
+const versions = ref([])
+const currentVersionPrompt = ref(null)
 
 // 右键菜单
 const contextMenuVisible = ref(false)
@@ -473,7 +561,8 @@ const showCreatePromptDialog = () => {
     prompt_name: '',
     prompt_content: '',
     description: '',
-    tags: []
+    tags: [],
+    change_description: ''
   }
   promptDialogVisible.value = true
 }
@@ -487,7 +576,8 @@ const editPrompt = (prompt) => {
     prompt_name: prompt.prompt_name,
     prompt_content: prompt.prompt_content,
     description: prompt.description || '',
-    tags: [...(prompt.tags || [])]
+    tags: [...(prompt.tags || [])],
+    change_description: ''
   }
   promptDialogVisible.value = true
 }
@@ -506,6 +596,12 @@ const submitPrompt = async () => {
   
   if (!promptForm.value.folder_id) {
     ElMessage.warning('请选择所属收藏夹')
+    return
+  }
+  
+  // 编辑时必须填写修改描述
+  if (isEditPrompt.value && !promptForm.value.change_description.trim()) {
+    ElMessage.warning('请填写修改描述')
     return
   }
   
@@ -565,6 +661,31 @@ const deletePrompt = async (prompt) => {
       console.error('删除Prompt失败:', error)
       ElMessage.error(error.detail || '删除Prompt失败')
     }
+  }
+}
+
+// ============ 版本历史操作 ============
+
+// 显示版本历史
+const showVersionHistory = async (prompt) => {
+  currentVersionPrompt.value = prompt
+  versionHistoryVisible.value = true
+  loadingVersions.value = true
+  versions.value = []
+  
+  try {
+    const response = await userPromptAPI.getVersions(prompt.id)
+    if (response.success) {
+      versions.value = response.data || []
+      if (versions.value.length === 0) {
+        ElMessage.info('暂无版本历史')
+      }
+    }
+  } catch (error) {
+    console.error('获取版本历史失败:', error)
+    ElMessage.error('获取版本历史失败')
+  } finally {
+    loadingVersions.value = false
   }
 }
 
@@ -816,6 +937,63 @@ onMounted(() => {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #bbb;
+}
+
+/* 版本历史样式 */
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.version-change {
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+}
+
+.version-content {
+  margin-top: 10px;
+}
+
+.version-field {
+  margin-bottom: 12px;
+}
+
+.version-field label {
+  font-weight: 600;
+  color: #333;
+  margin-right: 8px;
+}
+
+.version-field span {
+  color: #666;
+}
+
+.version-content-text {
+  margin-top: 8px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: #333;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.empty-text {
+  color: #999;
+  font-style: italic;
 }
 </style>
 

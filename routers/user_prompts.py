@@ -4,7 +4,8 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from schemas.user_prompt import (
     FolderCreate, FolderUpdate, FolderResponse,
-    PromptCreate, PromptUpdate, PromptResponse
+    PromptCreate, PromptUpdate, PromptResponse,
+    PromptVersionResponse
 )
 from schemas.common import Response
 from routers.auth import get_current_user
@@ -296,9 +297,10 @@ async def update_prompt(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    更新Prompt信息
+    更新Prompt信息（带版本控制）
     
     - **prompt_id**: Prompt ID
+    - **change_description**: 修改描述（必填）
     - **folder_id**: 新的所属收藏夹ID（可选）
     - **prompt_name**: 新的Prompt名称（可选）
     - **prompt_content**: 新的Prompt内容（可选）
@@ -339,6 +341,7 @@ async def update_prompt(
         success = db.update_prompt(
             prompt_id=prompt_id,
             user_id=user_id,
+            change_description=prompt.change_description,
             folder_id=prompt.folder_id,
             prompt_name=prompt.prompt_name,
             prompt_content=prompt.prompt_content,
@@ -436,5 +439,49 @@ async def search_prompts(
         raise HTTPException(
             status_code=500,
             detail=f"搜索Prompt失败: {str(e)}"
+        )
+
+# ============ 版本控制相关路由 ============
+
+@router.get("/versions/{prompt_id}", response_model=Response[List[PromptVersionResponse]], summary="获取Prompt版本历史")
+async def get_prompt_versions(
+    prompt_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取指定Prompt的所有版本历史
+    
+    - **prompt_id**: Prompt ID
+    """
+    try:
+        user_id = current_user.get('uid')
+        
+        # 验证Prompt是否存在
+        prompt = db.get_prompt_by_id(prompt_id)
+        if not prompt:
+            raise HTTPException(
+                status_code=404,
+                detail="Prompt不存在"
+            )
+        
+        if prompt['user_id'] != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="无权限查看此Prompt的版本历史"
+            )
+        
+        versions = db.get_prompt_versions(prompt_id, user_id)
+        
+        return Response(
+            success=True,
+            message=f"获取成功，共{len(versions)}个版本",
+            data=versions
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取版本历史失败: {str(e)}"
         )
 

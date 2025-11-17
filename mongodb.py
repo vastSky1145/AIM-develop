@@ -252,6 +252,7 @@ class PromptFolderDatabase:
         self.db = self.client[db_name]
         self.folders = self.db['prompt_folders']
         self.user_prompts = self.db['user_prompts']
+        self.prompt_versions = self.db['prompt_versions']  # 版本历史集合
     
     # ============ 收藏夹操作 ============
     
@@ -343,6 +344,7 @@ class PromptFolderDatabase:
                      tags: Optional[List[str]] = None) -> Optional[str]:
         """创建Prompt"""
         try:
+            now = datetime.now()
             prompt_doc = {
                 "user_id": user_id,
                 "folder_id": folder_id,
@@ -350,11 +352,27 @@ class PromptFolderDatabase:
                 "prompt_content": prompt_content,
                 "description": description,
                 "tags": tags if tags else [],
-                "created_at": datetime.now(),
-                "updated_at": datetime.now()
+                "current_version": 1,  # 初始版本号
+                "created_at": now,
+                "updated_at": now
             }
             result = self.user_prompts.insert_one(prompt_doc)
-            return str(result.inserted_id)
+            prompt_id = str(result.inserted_id)
+            
+            # 保存第一个版本快照
+            self._save_prompt_version(
+                prompt_id=prompt_id,
+                version=1,
+                user_id=user_id,
+                folder_id=folder_id,
+                prompt_name=prompt_name,
+                prompt_content=prompt_content,
+                description=description,
+                tags=tags if tags else [],
+                change_description="初始创建"
+            )
+            
+            return prompt_id
         except Exception as e:
             print(f"创建Prompt失败: {e}")
             return None
@@ -370,6 +388,9 @@ class PromptFolderDatabase:
             for prompt in prompts:
                 prompt['id'] = str(prompt['_id'])
                 del prompt['_id']
+                # 确保有current_version字段
+                if 'current_version' not in prompt:
+                    prompt['current_version'] = 1
             
             return prompts
         except Exception as e:
@@ -383,17 +404,34 @@ class PromptFolderDatabase:
             if prompt:
                 prompt['id'] = str(prompt['_id'])
                 del prompt['_id']
+                # 确保有current_version字段
+                if 'current_version' not in prompt:
+                    prompt['current_version'] = 1
             return prompt
         except Exception as e:
             print(f"获取Prompt失败: {e}")
             return None
     
-    def update_prompt(self, prompt_id: str, user_id: str, folder_id: Optional[str] = None,
-                     prompt_name: Optional[str] = None, prompt_content: Optional[str] = None,
-                     description: Optional[str] = None, tags: Optional[List[str]] = None) -> bool:
-        """更新Prompt"""
+    def update_prompt(self, prompt_id: str, user_id: str, change_description: str,
+                     folder_id: Optional[str] = None, prompt_name: Optional[str] = None, 
+                     prompt_content: Optional[str] = None, description: Optional[str] = None, 
+                     tags: Optional[List[str]] = None) -> bool:
+        """更新Prompt（带版本控制）"""
         try:
-            update_data = {"updated_at": datetime.now()}
+            # 获取当前Prompt信息（用于保存版本快照）
+            current_prompt = self.user_prompts.find_one({"_id": ObjectId(prompt_id), "user_id": user_id})
+            if not current_prompt:
+                return False
+            
+            # 获取当前版本号
+            current_version = current_prompt.get("current_version", 1)
+            new_version = current_version + 1
+            
+            # 准备更新数据
+            update_data = {
+                "updated_at": datetime.now(),
+                "current_version": new_version
+            }
             if folder_id is not None:
                 update_data["folder_id"] = folder_id
             if prompt_name is not None:
@@ -405,11 +443,28 @@ class PromptFolderDatabase:
             if tags is not None:
                 update_data["tags"] = tags
             
+            # 更新Prompt
             result = self.user_prompts.update_one(
                 {"_id": ObjectId(prompt_id), "user_id": user_id},
                 {"$set": update_data}
             )
-            return result.modified_count > 0
+            
+            if result.modified_count > 0:
+                # 保存新版本快照（使用更新后的值）
+                self._save_prompt_version(
+                    prompt_id=prompt_id,
+                    version=new_version,
+                    user_id=user_id,
+                    folder_id=folder_id if folder_id is not None else current_prompt.get("folder_id"),
+                    prompt_name=prompt_name if prompt_name is not None else current_prompt.get("prompt_name"),
+                    prompt_content=prompt_content if prompt_content is not None else current_prompt.get("prompt_content"),
+                    description=description if description is not None else current_prompt.get("description"),
+                    tags=tags if tags is not None else current_prompt.get("tags", []),
+                    change_description=change_description
+                )
+                return True
+            
+            return False
         except Exception as e:
             print(f"更新Prompt失败: {e}")
             return False
@@ -447,6 +502,49 @@ class PromptFolderDatabase:
             return prompts
         except Exception as e:
             print(f"搜索Prompt失败: {e}")
+            return []
+    
+    # ============ 版本控制操作 ============
+    
+    def _save_prompt_version(self, prompt_id: str, version: int, user_id: str,
+                            folder_id: str, prompt_name: str, prompt_content: str,
+                            description: Optional[str], tags: List[str],
+                            change_description: str) -> Optional[str]:
+        """保存Prompt版本快照（内部方法）"""
+        try:
+            version_doc = {
+                "prompt_id": prompt_id,
+                "version": version,
+                "user_id": user_id,
+                "folder_id": folder_id,
+                "prompt_name": prompt_name,
+                "prompt_content": prompt_content,
+                "description": description,
+                "tags": tags,
+                "change_description": change_description,
+                "created_at": datetime.now()
+            }
+            result = self.prompt_versions.insert_one(version_doc)
+            return str(result.inserted_id)
+        except Exception as e:
+            print(f"保存版本快照失败: {e}")
+            return None
+    
+    def get_prompt_versions(self, prompt_id: str, user_id: str) -> List[Dict[str, Any]]:
+        """获取Prompt的所有版本历史"""
+        try:
+            versions = list(self.prompt_versions.find({
+                "prompt_id": prompt_id,
+                "user_id": user_id
+            }).sort("version", -1))  # 按版本号降序排列
+            
+            for version in versions:
+                version['id'] = str(version['_id'])
+                del version['_id']
+            
+            return versions
+        except Exception as e:
+            print(f"获取版本历史失败: {e}")
             return []
 
 if __name__ == '__main__':

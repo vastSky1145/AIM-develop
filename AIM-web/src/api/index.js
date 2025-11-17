@@ -192,6 +192,11 @@ export const userPromptAPI = {
   },
   searchPrompts(keyword) {
     return api.get(`/user-prompts/search?keyword=${encodeURIComponent(keyword)}`)
+  },
+  
+  // 版本控制
+  getVersions(promptId) {
+    return api.get(`/user-prompts/versions/${promptId}`)
   }
 }
 
