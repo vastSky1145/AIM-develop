@@ -1,244 +1,331 @@
-<!-- dfe0a4c6-50eb-4b6d-802a-4e50e8512ea8 d5f1f4e4-f007-4786-a020-e51fddd8d0e1 -->
-# Prompt管理功能实现计划
+<!-- dfe0a4c6-50eb-4b6d-802a-4e50e8512ea8 070e0353-11e8-4c21-9a16-89343926a28a -->
+# Prompt版本控制功能实现计划
 
 ## 一、数据库设计（MongoDB）
 
-### 1. 收藏夹集合（prompt_folders）
+### 新增：Prompt版本集合（prompt_versions）
 
 ```javascript
 {
   _id: ObjectId,
-  user_id: String,           // 用户ID
-  folder_name: String,        // 收藏夹名称
-  description: String,        // 描述
-  created_at: DateTime,       // 创建时间
-  updated_at: DateTime        // 更新时间
+  prompt_id: String,           // 关联的Prompt ID
+  version_number: Number,      // 版本号（1, 2, 3...）
+  user_id: String,            // 用户ID
+  folder_id: String,          // 所属收藏夹ID（快照时）
+  prompt_name: String,        // Prompt名称（快照）
+  prompt_content: String,     // Prompt内容（完整快照）
+  description: String,        // Prompt描述（快照）
+  tags: [String],            // 标签（快照）
+  change_description: String, // 本次修改说明（必填）
+  created_at: DateTime,      // 创建时间
+  is_rollback: Boolean       // 是否由回滚操作创建
 }
 ```
 
-### 2. Prompt集合（user_prompts）
+### 修改：user_prompts集合
 
-```javascript
-{
-  _id: ObjectId,
-  user_id: String,           // 用户ID
-  folder_id: String,         // 所属收藏夹ID
-  prompt_name: String,       // Prompt名称
-  prompt_content: String,    // Prompt内容
-  description: String,       // 描述
-  tags: [String],           // 标签数组
-  created_at: DateTime,     // 创建时间
-  updated_at: DateTime      // 更新时间
-}
-```
+添加字段：
+
+- `current_version: Number` - 当前版本号
+- `total_versions: Number` - 总版本数
 
 ## 二、后端API实现
 
-### 1. 创建schemas（schemas/user_prompt.py）
+### 1. 扩展mongodb.py - PromptVersionDatabase类
 
-- FolderCreate/FolderUpdate/FolderResponse
-- PromptCreate/PromptUpdate/PromptResponse
-- FolderWithPromptsResponse
+新增方法：
 
-### 2. 扩展mongodb.py
+- `create_version()` - 创建版本快照
+- `get_versions_by_prompt()` - 获取Prompt的所有版本
+- `get_version_by_id()` - 获取特定版本详情
+- `rollback_to_version()` - 回滚到指定版本
+- `compare_versions()` - 对比两个版本
 
-- 添加PromptFolderDatabase类
-- 实现收藏夹的CRUD操作
-- 实现prompt的CRUD操作
+### 2. 修改现有Prompt操作逻辑
 
-### 3. 创建路由（routers/user_prompts.py）
+**创建Prompt时**：
 
-收藏夹相关：
+- 自动创建初始版本（version 1）
+- change_description: "初始创建"
 
-- `GET /api/user-prompts/folders` - 获取用户的所有收藏夹
-- `POST /api/user-prompts/folders` - 创建收藏夹
-- `PUT /api/user-prompts/folders/{folder_id}` - 更新收藏夹
-- `DELETE /api/user-prompts/folders/{folder_id}` - 删除收藏夹
+**更新Prompt时**：
 
-Prompt相关：
+- 创建新版本快照（version_number++）
+- 要求提供change_description（必填）
+- 更新current_version和total_versions
 
-- `GET /api/user-prompts/list` - 获取指定收藏夹下的所有prompts
-- `POST /api/user-prompts/create` - 创建prompt
-- `PUT /api/user-prompts/update/{prompt_id}` - 更新prompt
-- `DELETE /api/user-prompts/delete/{prompt_id}` - 删除prompt
-- `GET /api/user-prompts/search` - 搜索prompts
+### 3. 新增路由（routers/user_prompts.py）
 
-### 4. 注册路由到app.py
+版本控制相关：
 
-## 三、前端EditNodeDialog.vue修改
+- `GET /api/user-prompts/versions/{prompt_id}` - 获取版本历史列表
+- `GET /api/user-prompts/versions/detail/{version_id}` - 获取版本详情
+- `POST /api/user-prompts/versions/rollback/{prompt_id}` - 回滚到指定版本
+- `GET /api/user-prompts/versions/compare` - 对比两个版本
 
-在第91行下方添加两个下拉列表：
+### 4. 更新schemas/user_prompt.py
+
+新增模型：
+
+- `VersionResponse` - 版本响应
+- `VersionCompareRequest` - 版本对比请求
+- `VersionCompareResponse` - 版本对比响应
+
+修改模型：
+
+- `PromptUpdate` 添加 `change_description: str` 必填字段
+- `PromptResponse` 添加 `current_version` 和 `total_versions`
+
+## 三、前端实现
+
+### 1. 修改PromptManage.vue
+
+#### 在Prompt卡片上添加版本信息显示
 
 ```vue
-<div class="section">
-  <h3>Prompt 模板</h3>
-  
-  <!-- 新增：收藏夹选择 -->
-  <el-select 
-    v-model="selectedFolder" 
-    placeholder="选择收藏夹"
-    @change="handleFolderChange"
-    style="width: 100%; margin-bottom: 10px;">
-    <el-option
-      v-for="folder in folders"
-      :key="folder._id"
-      :label="folder.folder_name"
-      :value="folder._id"
-    />
-  </el-select>
-  
-  <!-- 新增：Prompt选择 -->
-  <el-select 
-    v-model="selectedPrompt" 
-    placeholder="选择Prompt模板"
-    @change="handlePromptChange"
-    style="width: 100%; margin-bottom: 10px;">
-    <el-option
-      v-for="prompt in folderPrompts"
-      :key="prompt._id"
-      :label="prompt.prompt_name"
-      :value="prompt._id"
-    />
-  </el-select>
-  
-  <p class="hint">已有内容和知识库内容用$$占位</p>
-  <el-input type="textarea" :rows="25" v-model="promptTemplate" />
+<div class="card-footer">
+  <div class="prompt-tags">...</div>
+  <div class="version-info">
+    <el-tag size="small" type="warning">v{{ prompt.current_version }}</el-tag>
+    <el-button 
+      type="text" 
+      size="small" 
+      @click="showVersionHistory(prompt)"
+    >
+      查看历史
+    </el-button>
+  </div>
+  <span class="prompt-time">...</span>
 </div>
 ```
 
-实现逻辑：
+#### 修改Prompt编辑对话框
 
-- onMounted时加载用户的收藏夹列表
-- 选择收藏夹时，加载该收藏夹下的prompt列表
-- 选择prompt时，自动填充到promptTemplate
+在提交时要求填写修改说明：
 
-## 四、前端创建PromptManage.vue
-
-### 布局设计
-
-```
-┌─────────────────────────────────────────┐
-│  📝 Prompt管理          [返回主页]       │
-├──────────┬──────────────────────────────┤
-│ 收藏夹   │       Prompt列表              │
-│ (25%)    │       (75%)                   │
-│          │                               │
-│ [新建]   │  搜索框                       │
-│          │  [新建Prompt]                 │
-│ 收藏夹1  │                               │
-│ 收藏夹2  │  ┌─────────────────────────┐ │
-│ ...      │  │ Prompt卡片1             │ │
-│          │  │ - 标题                  │ │
-│          │  │ - 描述                  │ │
-│          │  │ - 标签                  │ │
-│          │  │ [编辑] [删除]           │ │
-│          │  └─────────────────────────┘ │
-│          │                               │
-│          │  ┌─────────────────────────┐ │
-│          │  │ Prompt卡片2             │ │
-│          │  └─────────────────────────┘ │
-└──────────┴──────────────────────────────┘
+```vue
+<el-form-item label="修改说明" required v-if="isEditPrompt">
+  <el-input
+    v-model="promptForm.change_description"
+    type="textarea"
+    :rows="2"
+    placeholder="请描述本次修改的内容和原因..."
+  />
+</el-form-item>
 ```
 
-### 主要功能
+#### 新增版本历史对话框
 
-1. **左侧收藏夹列表**
+```vue
+<el-dialog 
+  v-model="versionHistoryVisible"
+  title="版本历史"
+  width="1000px"
+>
+  <!-- 左侧：版本列表 -->
+  <div class="version-history-layout">
+    <div class="version-list">
+      <div 
+        v-for="version in versions"
+        :key="version._id"
+        :class="['version-item', { active: selectedVersion?.id === version.id }]"
+        @click="selectVersion(version)"
+      >
+        <div class="version-header">
+          <el-tag size="small">v{{ version.version_number }}</el-tag>
+          <span v-if="version.is_rollback" class="rollback-badge">回滚</span>
+        </div>
+        <div class="version-time">{{ formatTime(version.created_at) }}</div>
+        <div class="version-change">{{ version.change_description }}</div>
+      </div>
+    </div>
+    
+    <!-- 右侧：版本详情和对比 -->
+    <div class="version-detail">
+      <el-tabs v-model="versionTab">
+        <el-tab-pane label="版本内容" name="content">
+          <div class="version-content">
+            <h4>{{ selectedVersion?.prompt_name }}</h4>
+            <p>{{ selectedVersion?.description }}</p>
+            <div class="tags">
+              <el-tag v-for="tag in selectedVersion?.tags" :key="tag">
+                {{ tag }}
+              </el-tag>
+            </div>
+            <pre>{{ selectedVersion?.prompt_content }}</pre>
+          </div>
+        </el-tab-pane>
+        
+        <el-tab-pane label="与当前版本对比" name="compare">
+          <div class="version-diff">
+            <!-- 使用diff库显示差异 -->
+          </div>
+        </el-tab-pane>
+      </el-tabs>
+      
+      <div class="version-actions">
+        <el-button 
+          type="primary" 
+          @click="rollbackToVersion"
+          :disabled="selectedVersion?.version_number === currentPrompt?.current_version"
+        >
+          回滚到此版本
+        </el-button>
+      </div>
+    </div>
+  </div>
+</el-dialog>
+```
 
-   - 显示所有收藏夹
-   - 新建收藏夹（对话框）
-   - 点击选中收藏夹
-   - 右键菜单：编辑、删除
+### 2. 更新API封装（api/index.js）
 
-2. **右侧Prompt列表**
-
-   - 搜索框（按名称搜索）
-   - 新建Prompt按钮
-   - Prompt卡片展示（名称、描述、标签）
-   - 编辑/删除按钮
-
-3. **编辑对话框**
-
-   - 收藏夹编辑：名称、描述
-   - Prompt编辑：名称、内容、描述、标签
-
-## 五、前端API封装（api/index.js）
-
-添加userPromptAPI模块：
+在userPromptAPI中添加：
 
 ```javascript
-export const userPromptAPI = {
-  // 收藏夹
-  getFolders() {
-    return api.get('/user-prompts/folders')
-  },
-  createFolder(data) {
-    return api.post('/user-prompts/folders', data)
-  },
-  updateFolder(folderId, data) {
-    return api.put(`/user-prompts/folders/${folderId}`, data)
-  },
-  deleteFolder(folderId) {
-    return api.delete(`/user-prompts/folders/${folderId}`)
-  },
-  
-  // Prompts
-  getPromptsByFolder(folderId) {
-    return api.get(`/user-prompts/list?folder_id=${folderId}`)
-  },
-  createPrompt(data) {
-    return api.post('/user-prompts/create', data)
-  },
-  updatePrompt(promptId, data) {
-    return api.put(`/user-prompts/update/${promptId}`, data)
-  },
-  deletePrompt(promptId) {
-    return api.delete(`/user-prompts/delete/${promptId}`)
-  },
-  searchPrompts(keyword) {
-    return api.get(`/user-prompts/search?keyword=${keyword}`)
-  }
+// 版本控制
+getVersions(promptId) {
+  return api.get(`/user-prompts/versions/${promptId}`)
+},
+getVersionDetail(versionId) {
+  return api.get(`/user-prompts/versions/detail/${versionId}`)
+},
+rollbackVersion(promptId, data) {
+  return api.post(`/user-prompts/versions/rollback/${promptId}`, data)
+},
+compareVersions(promptId, versionId1, versionId2) {
+  return api.get(`/user-prompts/versions/compare?prompt_id=${promptId}&version1=${versionId1}&version2=${versionId2}`)
 }
 ```
 
-## 六、路由配置（router.js）
+### 3. 安装diff库（可选）
 
-添加路由：
+如需要高级的差异对比显示：
+
+```bash
+npm install diff
+```
+
+在版本对比时使用：
 
 ```javascript
+import * as Diff from 'diff'
+
+const diff = Diff.diffWords(version1.content, version2.content)
+```
+
+## 四、实现细节
+
+### 版本创建时机
+
+1. **创建Prompt**：
+
+   - version_number = 1
+   - change_description = "初始创建"
+
+2. **更新Prompt**：
+
+   - 检查内容是否有实质性变化
+   - 如果有变化，要求填写change_description
+   - version_number = current_version + 1
+
+3. **回滚Prompt**：
+
+   - 创建新版本（不覆盖历史）
+   - is_rollback = true
+   - change_description = "回滚到版本 {version_number}: {原版本的change_description}"
+
+### 数据完整性
+
+- 版本快照包含Prompt的所有字段（完整备份）
+- 即使Prompt被删除，版本历史也保留（可选择是否级联删除）
+- 版本号连续递增，不允许跳号
+
+### 性能优化
+
+- 版本列表分页加载（每页20条）
+- 版本内容懒加载（点击时才加载详情）
+- 考虑对旧版本进行归档压缩（未来优化）
+
+## 五、用户体验设计
+
+### 修改Prompt流程
+
+1. 用户点击"编辑"
+2. 修改Prompt内容
+3. **必须填写"修改说明"（新增必填项）**
+4. 提交保存
+5. 系统创建新版本快照
+
+### 查看版本历史流程
+
+1. 在Prompt卡片上点击"查看历史"按钮
+2. 打开版本历史对话框
+3. 左侧显示版本时间线列表
+4. 点击版本查看详情或对比差异
+5. 可选择回滚到任意历史版本
+
+### 回滚操作
+
+1. 选择要回滚的版本
+2. 点击"回滚到此版本"
+3. 确认对话框提示影响
+4. 回滚后创建新版本（标记为rollback）
+5. 保留原有版本历史不变
+
+## 六、数据导出功能（为AI训练准备）
+
+### 导出接口
+
+`GET /api/user-prompts/export-training-data`
+
+导出格式：
+
+```json
 {
-  path: '/prompt-manage',
-  name: 'PromptManage',
-  component: () => import('./views/PromptManage.vue'),
-  meta: { requiresAuth: true }
+  "prompts": [
+    {
+      "prompt_id": "xxx",
+      "versions": [
+        {
+          "version": 1,
+          "content": "...",
+          "change_description": "初始创建",
+          "timestamp": "..."
+        },
+        {
+          "version": 2,
+          "content": "...",
+          "change_description": "优化了引言部分的逻辑",
+          "timestamp": "..."
+        }
+      ]
+    }
+  ]
 }
 ```
 
-可选：在MainLayout中添加入口按钮
+用于AI模型训练：
 
-## 技术要点
-
-- 使用Element Plus的el-select、el-card、el-tag等组件
-- 使用el-dialog实现编辑对话框
-- 使用el-dropdown实现右键菜单
-- 响应式数据管理（ref/reactive）
-- 适当的加载状态和错误处理
-- 删除操作需要确认对话框
+- 学习Prompt的演化模式
+- 理解修改意图和描述
+- 生成改进建议
 
 ## 文件清单
 
 **后端新增/修改**：
 
-1. `schemas/user_prompt.py` (新建)
-2. `routers/user_prompts.py` (新建)
-3. `mongodb.py` (修改，添加PromptFolderDatabase类)
-4. `app.py` (修改，注册新路由)
+1. `mongodb.py` - 添加PromptVersionDatabase类
+2. `schemas/user_prompt.py` - 添加版本相关模型
+3. `routers/user_prompts.py` - 添加版本控制路由，修改更新逻辑
 
-**前端新增/修改**：
+**前端修改**：
 
-1. `src/components/EditNodeDialog.vue` (修改)
-2. `src/views/PromptManage.vue` (新建)
-3. `src/api/index.js` (修改)
-4. `src/router.js` (修改)
+1. `src/views/PromptManage.vue` - 添加版本历史功能
+2. `src/api/index.js` - 添加版本API封装
+
+**可选依赖**：
+
+1. `npm install diff` - 用于版本差异对比显示
 
 ### To-dos
 
