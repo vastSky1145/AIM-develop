@@ -54,3 +54,21 @@ for meta in all_data['metadatas']:
 # print("以下是相关的信息：")
 # for i, doc in enumerate(search_results['documents'][0]):
 #     print(f"{i+1}. {doc}")
+
+class my_chromadb:
+    def __init__(self):
+        self.client = chromadb.PersistentClient(path="D:\\研究生资料\\AIM-develop-1119\\chroma_db")
+    
+    # 获取所有collection
+    def get_all_data(self):
+        collections = self.client.list_collections()
+        return collections
+
+if __name__ == '__main__':
+    my_chromadb = my_chromadb()
+    all_data = my_chromadb.get_all_data()
+    print(all_data)
+    # for collection in all_data:
+    #     data = collection.get()
+    #     print(collection.name,data)
+    #     print(collection.count())
