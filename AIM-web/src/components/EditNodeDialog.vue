@@ -149,6 +149,7 @@
       width="500px"
       draggable
       overflow
+      :modal="false" modal-penetrable
       :close-on-click-modal="false"
     >
       <div class="rating-content">

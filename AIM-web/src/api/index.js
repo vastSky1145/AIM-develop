@@ -8,7 +8,7 @@ const api = axios.create({
   // baseURL: 'http://localhost:8000/api',
   // baseURL: 'http://192.168.1.96:8000/api',
   baseURL: '/api',   // 相对路径，统一由 nginx 转发
-  timeout: 60000,
+  timeout: 900000,
   headers: {
     'Content-Type': 'application/json'
   }
