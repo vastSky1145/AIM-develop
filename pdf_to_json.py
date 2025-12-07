@@ -29,6 +29,11 @@ def pdf_to_json(filepath, user_id, output_path=default_output_path):
     # 传入的filepath直接就是PDF文件的路径
     print(f"上传的PDF文件路径：{filepath}")
 
+    # 确保输出目录存在
+    if not os.path.exists(default_output_dir):
+        os.makedirs(default_output_dir, exist_ok=True)
+        print(f"创建输出目录：{default_output_dir}")
+
     # 提取不带后缀文件名
     filename = Path(filepath).stem
     pdf_path = filepath  # 直接使用传入的文件路径
@@ -51,7 +56,25 @@ def pdf_to_json(filepath, user_id, output_path=default_output_path):
         os.environ.pop('HTTP_PROXY', None)
         os.environ.pop('HTTPS_PROXY', None)
         
-        subprocess.run(cmd, shell=True, check=True)
+        print(f"执行命令：{cmd}")
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        
+        # 合并 stdout 和 stderr 以便分析
+        full_output = (result.stdout or "") + "\n" + (result.stderr or "")
+        print(f"doc2x 输出：{full_output}")
+        
+        # doc2x 即使失败也可能返回退出码 0，需要检查输出内容
+        if "Failed to convert" in full_output or "failed to convert" in full_output:
+            # 提取错误信息
+            error_lines = [line for line in full_output.split('\n') if 'Failed' in line or 'error' in line.lower()]
+            error_msg = '\n'.join(error_lines) if error_lines else "PDF 解析失败，请检查文件是否为有效的 PDF"
+            raise Exception(f"doc2x 解析失败：{error_msg}")
+        
+        if result.returncode != 0:
+            raise Exception(f"doc2x 命令执行失败，退出码：{result.returncode}")
+            
+    except subprocess.CalledProcessError as e:
+        raise Exception(f"doc2x 命令执行失败：{e.stderr if e.stderr else str(e)}")
     finally:
         # 恢复代理设置
         if old_http_proxy:
@@ -62,12 +85,28 @@ def pdf_to_json(filepath, user_id, output_path=default_output_path):
             os.environ['HTTP_PROXY'] = old_HTTP_PROXY
         if old_HTTPS_PROXY:
             os.environ['HTTPS_PROXY'] = old_HTTPS_PROXY
+    
     txt_dir = os.path.join(default_output_dir, filename)
     txt_filename = f"{filename}.txt"
     text_path = os.path.join(txt_dir, txt_filename)
 
     # 第三步：txt to json
     print(f"转化为TXT文件的相对路径：{text_path}")
+    
+    # 检查文件是否存在
+    if not os.path.exists(text_path):
+        # 列出输出目录中的内容，帮助调试
+        if os.path.exists(txt_dir):
+            files_in_dir = os.listdir(txt_dir)
+            print(f"目录 {txt_dir} 中的文件：{files_in_dir}")
+        else:
+            print(f"目录 {txt_dir} 不存在")
+            # 列出 Output 目录中的内容
+            if os.path.exists(default_output_dir):
+                dirs_in_output = os.listdir(default_output_dir)
+                print(f"Output 目录中的内容：{dirs_in_output}")
+        raise FileNotFoundError(f"doc2x 未能生成预期的文件：{text_path}")
+    
     # 从路径读文件
     with open(text_path, 'r', encoding='utf-8') as f:
         text_content = f.read()
