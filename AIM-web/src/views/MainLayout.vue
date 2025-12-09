@@ -103,14 +103,51 @@
             node-key="id"
             default-expand-all
             :props="treeProps"
+            draggable
+            :allow-drop="allowDrop"
+            :allow-drag="allowDrag"
             @node-click="handleNodeClick"
             @node-contextmenu="handleNodeRightClick"
+            @node-drag-start="handleDragStart"
+            @node-drag-end="handleDragEnd"
+            @node-drop="handleDrop"
             class="paper-tree"
           >
             <template #default="{ node, data }">
               <span class="tree-node">
-                <span>{{ node.label }}</span>
-                <span v-if="data.content" class="node-has-content">📄</span>
+                <span class="node-label">
+                  <span>{{ node.label }}</span>
+                  <span v-if="data.content" class="node-has-content">📄</span>
+                </span>
+                <span class="node-actions">
+                  <el-button
+                    type="primary"
+                    size="small"
+                    link
+                    @click.stop="handleAppendNode(data)"
+                    title="添加子节点"
+                  >
+                    <el-icon><Plus /></el-icon>
+                  </el-button>
+                  <el-button
+                    type="success"
+                    size="small"
+                    link
+                    @click.stop="handleInsertBefore(node, data)"
+                    title="在前面插入节点"
+                  >
+                    <el-icon><Top /></el-icon>
+                  </el-button>
+                  <el-button
+                    type="danger"
+                    size="small"
+                    link
+                    @click.stop="handleRemoveNode(node, data)"
+                    title="删除节点"
+                  >
+                    <el-icon><Delete /></el-icon>
+                  </el-button>
+                </span>
               </span>
             </template>
           </el-tree>
@@ -252,7 +289,7 @@
 import { ref, reactive, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
-import { UploadFilled } from "@element-plus/icons-vue";
+import { UploadFilled, Plus, Top, Delete } from "@element-plus/icons-vue";
 import { paperAPI, authAPI } from "@/api";
 import EditNodeDialog from "@/components/EditNodeDialog.vue";
 import { parse } from "pptxtojson";
@@ -397,6 +434,133 @@ const expandAllChildren = (node) => {
   if (node.childNodes) {
     node.childNodes.forEach((child) => expandAllChildren(child));
   }
+};
+
+// ==================== 拖拽相关函数 ====================
+
+// 判断是否允许放置
+const allowDrop = (draggingNode, dropNode, type) => {
+  // type: 'prev' | 'inner' | 'next'
+  // 允许所有类型的放置
+  return true;
+};
+
+// 判断是否允许拖拽
+const allowDrag = (draggingNode) => {
+  // 允许所有节点拖拽
+  return true;
+};
+
+// 拖拽开始
+const handleDragStart = (node, event) => {
+  console.log("拖拽开始:", node.data.title);
+  updateStatus(`正在拖拽: ${node.data.title}`, "warning");
+};
+
+// 拖拽结束
+const handleDragEnd = (draggingNode, dropNode, dropType, event) => {
+  console.log("拖拽结束:", draggingNode.data.title);
+  updateStatus("拖拽结束", "success");
+};
+
+// 拖拽成功放置
+const handleDrop = (draggingNode, dropNode, dropType, event) => {
+  console.log("拖拽放置:", {
+    dragging: draggingNode.data.title,
+    drop: dropNode.data.title,
+    type: dropType,
+  });
+  updateStatus(`节点已移动到 ${dropNode.data.title} ${dropType === 'inner' ? '内部' : dropType === 'prev' ? '之前' : '之后'}`, "success");
+  ElMessage.success("节点位置已更新");
+};
+
+// ==================== 节点增删函数 ====================
+
+// 生成唯一节点 ID
+let nodeIdCounter = 1;
+const generateNodeId = () => {
+  return `node-${Date.now()}-${nodeIdCounter++}`;
+};
+
+// 添加子节点
+const handleAppendNode = (data) => {
+  ElMessageBox.prompt("请输入新节点标题", "添加子节点", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    inputPattern: /\S+/,
+    inputErrorMessage: "节点标题不能为空",
+  })
+    .then(({ value }) => {
+      const newChild = {
+        id: generateNodeId(),
+        title: value,
+        children: [],
+        content: "",
+      };
+      if (!data.children) {
+        data.children = [];
+      }
+      data.children.push(newChild);
+      ElMessage.success(`已添加子节点: ${value}`);
+      updateStatus(`已添加子节点: ${value}`, "success");
+    })
+    .catch(() => {
+      // 取消操作
+    });
+};
+
+// 在节点前插入
+const handleInsertBefore = (node, data) => {
+  ElMessageBox.prompt("请输入新节点标题", "插入节点", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    inputPattern: /\S+/,
+    inputErrorMessage: "节点标题不能为空",
+  })
+    .then(({ value }) => {
+      const newNode = {
+        id: generateNodeId(),
+        title: value,
+        children: [],
+        content: "",
+      };
+      
+      const parent = node.parent;
+      const children = parent.data.children || parent.data;
+      const index = children.findIndex((d) => d.id === data.id);
+      
+      if (index !== -1) {
+        children.splice(index, 0, newNode);
+        ElMessage.success(`已插入节点: ${value}`);
+        updateStatus(`已插入节点: ${value}`, "success");
+      }
+    })
+    .catch(() => {
+      // 取消操作
+    });
+};
+
+// 删除节点
+const handleRemoveNode = (node, data) => {
+  ElMessageBox.confirm(`确定要删除节点"${data.title}"吗？`, "删除确认", {
+    confirmButtonText: "确定",
+    cancelButtonText: "取消",
+    type: "warning",
+  })
+    .then(() => {
+      const parent = node.parent;
+      const children = parent.data.children || parent.data;
+      const index = children.findIndex((d) => d.id === data.id);
+      
+      if (index !== -1) {
+        children.splice(index, 1);
+        ElMessage.success(`已删除节点: ${data.title}`);
+        updateStatus(`已删除节点: ${data.title}`, "success");
+      }
+    })
+    .catch(() => {
+      // 取消操作
+    });
 };
 
 // 大纲右键
@@ -804,7 +968,35 @@ onMounted(() => {
   padding-right: 8px;
 }
 
+.node-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .node-has-content {
+  font-size: 12px;
+}
+
+.node-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  margin-left: 8px;
+}
+
+.tree-node:hover .node-actions {
+  opacity: 1;
+}
+
+.node-actions .el-button {
+  padding: 2px 4px;
   font-size: 12px;
 }
 
@@ -865,6 +1057,27 @@ onMounted(() => {
 :deep(.el-tree-node__content) {
   height: 32px;
   font-size: 14px;
+}
+
+/* 拖拽状态样式 */
+:deep(.el-tree-node.is-drop-inner > .el-tree-node__content) {
+  background-color: #e6f7ff;
+  border: 1px dashed #1890ff;
+}
+
+:deep(.el-tree-node__content:hover) {
+  background-color: #f5f5f5;
+}
+
+:deep(.el-tree-node.is-dragging > .el-tree-node__content) {
+  opacity: 0.6;
+  background-color: #e6f7ff;
+}
+
+/* 拖拽占位线样式 */
+:deep(.el-tree__drop-indicator) {
+  height: 2px;
+  background-color: #1890ff;
 }
 
 :deep(.el-upload-dragger) {
