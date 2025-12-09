@@ -21,6 +21,8 @@ import tempfile
 import os
 from pathlib import Path
 
+from utils.test_pdf_parse_locally import parse_pdf_to_json_locally
+
 router = APIRouter()
 db = PaperDatabase()
 
@@ -113,6 +115,67 @@ async def get_paper_list(current_user: dict = Depends(get_current_user)):
 #             os.unlink(tmp_file_path)
 
 #新api，上传参数为pdf文件（由用户在本地ppt转化的pdf文件）
+# @router.post("/upload-pdf", response_model=Response[PaperResponse], summary="上传pdf文件并解析")
+# async def upload_pdf(
+#     file: UploadFile = File(..., description="pdf文件"),
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """
+#     上传pdf文件并解析为论文结构
+#
+#     - 支持.pdf格式
+#     - 自动解析为结构化JSON
+#     - 保存到数据库
+#     """
+#     # user_id = current_user.get("user_id")
+#     user_id = current_user.get("uid")
+#
+#     # 验证文件类型
+#     if not file.filename.endswith(('.pdf')):
+#         raise HTTPException(
+#             status_code=400,
+#             detail="只支持pdf文件格式（.pdf）"
+#         )
+#
+#     # 保存临时文件
+#     try:
+#         # 创建临时文件
+#         suffix = Path(file.filename).suffix#suffix函数返回文件的后缀名
+#         with tempfile.NamedTemporaryFile(delete=True, suffix=suffix) as tmp_file:
+#             content = await file.read()
+#             tmp_file.write(content)
+#             tmp_file_path = tmp_file.name
+#
+#         # 调用PPT解析函数
+#         json_content = pdf_to_json(tmp_file_path, user_id)
+#         paper_data = json.loads(json_content)
+#
+#         # 保存到数据库
+#         paper_id = db.save_paper(paper_data)
+#
+#         if paper_id is None:
+#             raise HTTPException(
+#                 status_code=500,
+#                 detail="保存论文到数据库失败"
+#             )
+#
+#         return Response(
+#             success=True,
+#             message="PPT解析成功",
+#             data=paper_data
+#         )
+#
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"PPT解析失败: {str(e)}"
+#         )
+#     finally:
+#         # 清理临时文件
+#         if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
+#             os.unlink(tmp_file_path)
+
+#更新的api，不使用doc2x解析
 @router.post("/upload-pdf", response_model=Response[PaperResponse], summary="上传pdf文件并解析")
 async def upload_pdf(
     file: UploadFile = File(..., description="pdf文件"),
@@ -145,7 +208,9 @@ async def upload_pdf(
             tmp_file_path = tmp_file.name
 
         # 调用PPT解析函数
-        json_content = pdf_to_json(tmp_file_path, user_id)
+        json_content = parse_pdf_to_json_locally(tmp_file_path)
+        # json_content = pdf_to_json(tmp_file_path, user_id)
+        json_content["uid"] = user_id
         paper_data = json.loads(json_content)
 
         # 保存到数据库
@@ -172,6 +237,7 @@ async def upload_pdf(
         # 清理临时文件
         if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path)
+
 
 @router.post("/create", response_model=Response[PaperResponse], summary="创建新论文")
 async def create_paper(
