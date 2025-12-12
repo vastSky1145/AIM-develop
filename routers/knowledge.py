@@ -14,14 +14,14 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import CharacterTextSplitter
-from filter import filter_paper_content
 from typing import List
 import os
 import tempfile
-import subprocess
 from pathlib import Path
 import shutil
 from collections import defaultdict
+import pdfplumber
+from PyPDF2 import PdfReader
 
 router = APIRouter()
 
@@ -35,6 +35,25 @@ if not os.environ.get("HF_ENDPOINT") and not os.environ.get("HUGGINGFACE_HUB_BAS
 embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
 text_splitter = CharacterTextSplitter(chunk_size=800, chunk_overlap=150)
+
+
+def get_knowledge_pdf_text_by_page_in_pypdf2(pdf_file_path):
+    """使用PyPDF2按页提取PDF文本（优先使用，识别更准，但可能因编码格式报错）"""
+    with open(pdf_file_path, 'rb') as file:
+        reader = PdfReader(file)
+        texts_in_page = []
+        for page in reader.pages:
+            texts_in_page.append(page.extract_text())
+        return texts_in_page
+
+
+def get_knowledge_pdf_text_by_page_in_plumber(pdf_file_path):
+    """使用pdfplumber按页提取PDF文本（备用方案）"""
+    with pdfplumber.open(pdf_file_path) as pdf:
+        texts_in_page = []
+        for page in pdf.pages:
+            texts_in_page.append(page.extract_text())
+        return texts_in_page
 
 @router.post("/search", response_model=Response[KnowledgeSearchResponse], summary="检索知识库")
 async def search_knowledge(
@@ -86,6 +105,140 @@ async def search_knowledge(
             detail=f"检索失败: {str(e)}"
         )
 
+# @router.post("/upload-pdf", response_model=Response[dict], summary="上传PDF到知识库")
+# async def upload_pdf(
+#     file: UploadFile = File(..., description="PDF文件"),
+#     current_user: dict = Depends(get_current_user)
+# ):
+#     """
+#     上传PDF文件到知识库
+#
+#     - 自动解析PDF内容
+#     - 过滤无关内容
+#     - 分块存储到向量数据库
+#     """
+#     user_id = current_user.get("uid")# or current_user.get("user_id") or current_user.get("id") or current_user.get("username")
+#     original_filename = os.path.basename(file.filename)
+#
+#     if not user_id:
+#         raise HTTPException(
+#             status_code=401,
+#             detail="无法获取用户信息"
+#         )
+#
+#     # 验证文件类型
+#     if not file.filename.endswith('.pdf'):
+#         raise HTTPException(
+#             status_code=400,
+#             detail="只支持PDF文件格式"
+#         )
+#
+#     # 验证文件名（不允许空格）
+#     if ' ' in file.filename:
+#         raise HTTPException(
+#             status_code=400,
+#             detail=f"文件名不允许包含空格：{file.filename}"
+#         )
+#
+#     # 检查是否已存在
+#     try:
+#         collection = vectorstore._collection
+#         existing = collection.get(where={"source": original_filename}, limit=1)
+#         if len(existing['ids']) == 0:
+#             existing = collection.get(where={"original_filename": original_filename,"uid": user_id}, limit=1)
+#         if len(existing['ids']) > 0:
+#             raise HTTPException(
+#                 status_code=400,
+#                 detail=f"文件已存在：{file.filename}"
+#             )
+#     except Exception as e:
+#         pass
+#
+#     temp_dir = None
+#     tmp_file_path = None
+#
+#     try:
+#         # 保存临时文件，文件名保持与原始上传文件一致
+#         temp_dir = tempfile.mkdtemp()
+#         tmp_file_path = os.path.join(temp_dir, original_filename)
+#         content = await file.read()
+#         with open(tmp_file_path, 'wb') as tmp_file:
+#             tmp_file.write(content)
+#         print(f"tmp_file_path: {tmp_file_path}")
+#
+#         # 使用 doc2x 解析 PDF
+#         app_key = "sk-bzllfk7oftj7tv4he6rc7bfdz92iqtn0"
+#         cmd = f'doc2x -k {app_key} --graphrag "{tmp_file_path}"'
+#         subprocess.run(cmd, shell=True, check=True)
+#
+#         file_stem = Path(original_filename).stem
+#         output_dir = Path("./Output") / file_stem
+#         output_txt = output_dir / f"{file_stem}.txt"
+#         print(f"output_txt: {output_txt}")
+#
+#         if not output_txt.exists():
+#             raise FileNotFoundError(f"解析结果未找到：{output_txt}")
+#
+#         raw_content = output_txt.read_text(encoding='utf-8')
+#
+#         # 删除 doc2x 生成的原始文本，后续仅保留过滤后内容
+#         try:
+#             output_txt.unlink()
+#         except FileNotFoundError:
+#             pass
+#
+#         # 过滤内容
+#         pure_content = filter_paper_content(raw_content)
+#
+#         # 保存过滤后的内容
+#         output_dir.mkdir(parents=True, exist_ok=True)
+#         filtered_txt = output_dir / f"{file_stem}_filtered.txt"
+#         filtered_txt.write_text(pure_content, encoding='utf-8')
+#
+#         # 加载并分割文档
+#         loader = TextLoader(str(filtered_txt), encoding="UTF-8")
+#         documents = loader.load()
+#         docs = text_splitter.split_documents(documents)
+#
+#         storage_path = str(filtered_txt)
+#         output_dir_path = str(output_dir)
+#         uploaded_at = datetime.now().isoformat()
+#
+#         for index, doc in enumerate(docs):
+#             doc.metadata["uid"] = str(user_id)
+#             doc.metadata["uploaded_at"] = uploaded_at
+#             doc.metadata["original_filename"] = original_filename
+#             doc.metadata["source"] = original_filename
+#             doc.metadata["storage_path"] = storage_path
+#             doc.metadata["output_dir"] = output_dir_path
+#             doc.metadata["chunk_index"] = index
+#
+#         # 添加到向量数据库
+#         vectorstore.add_documents(docs)
+#
+#         return Response(
+#             success=True,
+#             message=f"PDF已成功添加到知识库，共{len(docs)}个文档块",
+#             data={
+#                 "filename": file.filename,
+#                 "chunks": len(docs),
+#                 "content_preview": pure_content[:500] + "..."
+#             }
+#         )
+#
+#     except Exception as e:
+#         raise HTTPException(
+#             status_code=500,
+#             detail=f"处理PDF失败: {str(e)}"
+#         )
+#     finally:
+#         # 清理临时文件
+#         if 'tmp_file_path' in locals() and tmp_file_path and os.path.exists(tmp_file_path):
+#             os.unlink(tmp_file_path)
+#         if 'temp_dir' in locals() and temp_dir and os.path.isdir(temp_dir):
+#             shutil.rmtree(temp_dir, ignore_errors=True)
+
+#新方法，无需为api付费
 @router.post("/upload-pdf", response_model=Response[dict], summary="上传PDF到知识库")
 async def upload_pdf(
     file: UploadFile = File(..., description="PDF文件"),
@@ -94,8 +247,7 @@ async def upload_pdf(
     """
     上传PDF文件到知识库
 
-    - 自动解析PDF内容
-    - 过滤无关内容
+    - 使用本地方法解析PDF内容（PyPDF2优先，pdfplumber备选）
     - 分块存储到向量数据库
     """
     user_id = current_user.get("uid")# or current_user.get("user_id") or current_user.get("id") or current_user.get("username")
@@ -147,41 +299,28 @@ async def upload_pdf(
             tmp_file.write(content)
         print(f"tmp_file_path: {tmp_file_path}")
 
-        # 使用 doc2x 解析 PDF
-        app_key = "sk-bzllfk7oftj7tv4he6rc7bfdz92iqtn0"
-        cmd = f'doc2x -k {app_key} --graphrag "{tmp_file_path}"'
-        subprocess.run(cmd, shell=True, check=True)
+        # 使用本地方法解析PDF（优先PyPDF2，失败则用pdfplumber）
+        try:
+            texts_in_page = get_knowledge_pdf_text_by_page_in_pypdf2(tmp_file_path)
+        except Exception:
+            texts_in_page = get_knowledge_pdf_text_by_page_in_plumber(tmp_file_path)
 
+        # 合并所有页面文本
+        raw_content = "\n".join([text for text in texts_in_page if text])
+
+        # 保存解析内容
         file_stem = Path(original_filename).stem
         output_dir = Path("./Output") / file_stem
-        output_txt = output_dir / f"{file_stem}.txt"
-        print(f"output_txt: {output_txt}")
-
-        if not output_txt.exists():
-            raise FileNotFoundError(f"解析结果未找到：{output_txt}")
-
-        raw_content = output_txt.read_text(encoding='utf-8')
-
-        # 删除 doc2x 生成的原始文本，后续仅保留过滤后内容
-        try:
-            output_txt.unlink()
-        except FileNotFoundError:
-            pass
-
-        # 过滤内容
-        pure_content = filter_paper_content(raw_content)
-
-        # 保存过滤后的内容
         output_dir.mkdir(parents=True, exist_ok=True)
-        filtered_txt = output_dir / f"{file_stem}_filtered.txt"
-        filtered_txt.write_text(pure_content, encoding='utf-8')
+        output_txt = output_dir / f"{file_stem}.txt"
+        output_txt.write_text(raw_content, encoding='utf-8')
 
         # 加载并分割文档
-        loader = TextLoader(str(filtered_txt), encoding="UTF-8")
+        loader = TextLoader(str(output_txt), encoding="UTF-8")
         documents = loader.load()
         docs = text_splitter.split_documents(documents)
 
-        storage_path = str(filtered_txt)
+        storage_path = str(output_txt)
         output_dir_path = str(output_dir)
         uploaded_at = datetime.now().isoformat()
 
@@ -203,7 +342,7 @@ async def upload_pdf(
             data={
                 "filename": file.filename,
                 "chunks": len(docs),
-                "content_preview": pure_content[:500] + "..."
+                "content_preview": raw_content[:500] + "..."
             }
         )
 
@@ -218,6 +357,7 @@ async def upload_pdf(
             os.unlink(tmp_file_path)
         if 'temp_dir' in locals() and temp_dir and os.path.isdir(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
+
 
 @router.get("/sources", response_model=Response[List[KnowledgeSource]], summary="获取知识来源列表")
 async def get_sources(current_user: dict = Depends(get_current_user)):
