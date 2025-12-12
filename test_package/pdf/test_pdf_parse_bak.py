@@ -299,7 +299,7 @@ def group_by_line(words: list, y_tolerance: float = 3.0) -> list:
 #         else:
 #             print(lines[0])
 #             continue
-    return None
+#     return None
 
 
 if __name__ == '__main__':
