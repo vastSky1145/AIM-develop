@@ -210,8 +210,8 @@ async def upload_pdf(
         # 调用PPT解析函数
         json_content = parse_pdf_to_json_locally(tmp_file_path)
         # json_content = pdf_to_json(tmp_file_path, user_id)
-        json_content["uid"] = user_id
         paper_data = json.loads(json_content)
+        paper_data["uid"] = user_id
 
         # 保存到数据库
         paper_id = db.save_paper(paper_data)

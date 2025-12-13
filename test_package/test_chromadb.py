@@ -17,17 +17,17 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 # print(docs)
 # for i, doc in enumerate(docs):
 #     print(f"{i+1}. {doc.page_content}")
-client = chromadb.PersistentClient(path="../chroma_db")
-collection = client.get_collection("langchain")
-all_data = collection.get()
-print("IDs:", all_data['ids'])
-print("Documents:", all_data['documents'])
-for doc in all_data['documents']:
-    print("----------------------------------------------------------")
-    print(doc)
-print("Metadatas:", all_data['metadatas'])
-for meta in all_data['metadatas']:
-    print(meta)
+# client = chromadb.PersistentClient(path="../chroma_db")
+# collection = client.get_collection("langchain")
+# all_data = collection.get()
+# print("IDs:", all_data['ids'])
+# print("Documents:", all_data['documents'])
+# for doc in all_data['documents']:
+#     print("----------------------------------------------------------")
+#     print(doc)
+# print("Metadatas:", all_data['metadatas'])
+# for meta in all_data['metadatas']:
+#     print(meta)
 # collection = client.get_or_create_collection(name="fruits_knowledge")
 
 # # 准备数据并添加到集合
@@ -54,3 +54,22 @@ for meta in all_data['metadatas']:
 # print("以下是相关的信息：")
 # for i, doc in enumerate(search_results['documents'][0]):
 #     print(f"{i+1}. {doc}")
+
+class my_chromadb:
+    def __init__(self):
+        self.client = chromadb.PersistentClient(path="../chroma_db")
+    
+    # 获取所有collection
+    def get_all_data(self):
+        collections = self.client.list_collections()
+        return collections
+
+if __name__ == '__main__':
+    print("开始测试")
+    my_chromadb = my_chromadb()
+    all_data = my_chromadb.get_all_data()
+    # print(all_data)
+    for collection in all_data:
+        print(f"collection: {collection.name} 的文档数量为: {collection.count()}")
+        data = collection.get()
+        print(type(data))
