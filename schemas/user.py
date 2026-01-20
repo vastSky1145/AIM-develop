@@ -6,7 +6,7 @@ from typing import Optional
 
 class UserLogin(BaseModel):
     """用户登录请求"""
-    username: str = Field(..., min_length=3, max_length=50, description="用户名")
+    username: str = Field(..., min_length=1, max_length=50, description="用户名")
     password: str = Field(..., min_length=6, description="密码")
     
     class Config:
@@ -19,7 +19,7 @@ class UserLogin(BaseModel):
 
 class UserRegister(BaseModel):
     """用户注册请求"""
-    username: str = Field(..., min_length=3, max_length=50, description="用户名")
+    username: str = Field(..., min_length=1, max_length=50, description="用户名")
     password: str = Field(..., min_length=6, description="密码")
     email: Optional[EmailStr] = Field(None, description="邮箱（可选）")
 
