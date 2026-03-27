@@ -1,7 +1,7 @@
 """
 用户认证相关路由
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from schemas.user import UserLogin, UserRegister, UserInfo, LoginResponse, ChangePassword
 from schemas.common import Response
@@ -12,6 +12,8 @@ from utils.auth import create_access_token, verify_token
 # from mongodb import PaperDatabase
 # from utils.auth import create_access_token, verify_token
 from datetime import timedelta
+from utils.rate_limiter import rate_limiter
+from config import settings
 
 router = APIRouter()
 security = HTTPBearer()
@@ -23,7 +25,7 @@ db = PaperDatabase()
 ACCESS_TOKEN_EXPIRE_DAYS = 7
 
 @router.post("/login", response_model=Response[LoginResponse], summary="用户登录")
-async def login(user: UserLogin):
+async def login(user: UserLogin, request: Request):
     """
     用户登录接口
     
@@ -32,6 +34,11 @@ async def login(user: UserLogin):
     
     返回JWT令牌和用户信息
     """
+    # 以客户端 IP 为粒度进行速率限制，防止暴力破解
+    client_ip = (request.client.host if request.client else None) or "unknown"
+    cfg = settings.RATE_LIMITS["auth"]
+    await rate_limiter.check_rate_limit(client_ip, "auth", cfg["max_requests"], cfg["window_seconds"])
+
     # 验证用户
     verify_result = db.verify_user(user.username, user.password)
     
@@ -105,8 +112,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     print(f"以下是用户信息\n{payload}")
     return payload
 
+# 以包为粒度的速率限制依赖（auth 包已认证端点统一限速）
+_rate_limit = rate_limiter.make_dependency(
+    package_name="auth",
+    get_user_fn=get_current_user,
+    **settings.RATE_LIMITS["auth"],
+)
+
 @router.get("/me", response_model=Response[UserInfo], summary="获取当前用户信息")
-async def get_me(current_user: dict = Depends(get_current_user)):
+async def get_me(current_user: dict = Depends(_rate_limit)):
     """
     获取当前登录用户的信息
     """
@@ -125,7 +139,7 @@ async def get_me(current_user: dict = Depends(get_current_user)):
 @router.post("/change-password", response_model=Response, summary="修改密码")
 async def change_password(
     password_data: ChangePassword,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     修改当前用户密码

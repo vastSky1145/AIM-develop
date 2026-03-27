@@ -22,12 +22,21 @@ import os
 from pathlib import Path
 
 from utils.test_pdf_parse_locally import parse_pdf_to_json_locally
+from utils.rate_limiter import rate_limiter
+from config import settings
 
 router = APIRouter()
 db = PaperDatabase()
 
+# 以包为粒度的速率限制依赖（papers 包统一限速）
+_rate_limit = rate_limiter.make_dependency(
+    package_name="papers",
+    get_user_fn=get_current_user,
+    **settings.RATE_LIMITS["papers"],
+)
+
 @router.get("/list", response_model=Response[List[PaperResponse]], summary="获取论文列表")
-async def get_paper_list(current_user: dict = Depends(get_current_user)):
+async def get_paper_list(current_user: dict = Depends(_rate_limit)):
     """
     获取当前用户的所有论文列表
     """
@@ -57,7 +66,7 @@ async def get_paper_list(current_user: dict = Depends(get_current_user)):
 # @router.post("/upload-ppt", response_model=Response[PaperResponse], summary="上传PPT并解析")
 # async def upload_ppt(
 #     file: UploadFile = File(..., description="PPT文件"),
-#     current_user: dict = Depends(get_current_user)
+#     current_user: dict = Depends(_rate_limit)
 # ):
 #     """
 #     上传PPT文件并解析为论文结构
@@ -118,7 +127,7 @@ async def get_paper_list(current_user: dict = Depends(get_current_user)):
 # @router.post("/upload-pdf", response_model=Response[PaperResponse], summary="上传pdf文件并解析")
 # async def upload_pdf(
 #     file: UploadFile = File(..., description="pdf文件"),
-#     current_user: dict = Depends(get_current_user)
+#     current_user: dict = Depends(_rate_limit)
 # ):
 #     """
 #     上传pdf文件并解析为论文结构
@@ -179,7 +188,7 @@ async def get_paper_list(current_user: dict = Depends(get_current_user)):
 @router.post("/upload-pdf", response_model=Response[PaperResponse], summary="上传pdf文件并解析")
 async def upload_pdf(
     file: UploadFile = File(..., description="pdf文件"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     上传pdf文件并解析为论文结构
@@ -242,7 +251,7 @@ async def upload_pdf(
 @router.post("/create", response_model=Response[PaperResponse], summary="创建新论文")
 async def create_paper(
     paper: PaperCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     创建新论文
@@ -276,7 +285,7 @@ async def create_paper(
 @router.put("/update", response_model=Response[PaperResponse], summary="更新论文")
 async def update_paper(
     paper: PaperCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     更新论文内容
@@ -305,7 +314,7 @@ async def update_paper(
 @router.delete("/delete", response_model=Response[bool], summary="删除论文")
 async def delete_paper(
     request: DeletePaperRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     删除论文
@@ -342,7 +351,7 @@ async def delete_paper(
 @router.get("/get/{paper_title}", response_model=Response[PaperResponse], summary="获取论文详情")
 async def get_paper(
     paper_title: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     根据标题获取论文详情

@@ -9,12 +9,21 @@ from AI import llm
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from mongodb import LogDatabase
+from utils.rate_limiter import rate_limiter
+from config import settings
 
 router = APIRouter()
 log_database = LogDatabase()
 
 # 创建线程池执行器
 executor = ThreadPoolExecutor(max_workers=4)
+
+# 以包为粒度的速率限制依赖（ai_assistant 包统一限速）
+_rate_limit = rate_limiter.make_dependency(
+    package_name="ai_assistant",
+    get_user_fn=get_current_user,
+    **settings.RATE_LIMITS["ai_assistant"],
+)
 
 def call_llm_sync(prompt: str) -> str:
     """
@@ -37,7 +46,7 @@ def call_llm_sync(prompt: str) -> str:
 @router.post("/generate", response_model=Response[GenerateContentResponse], summary="生成内容")
 async def generate_content(
     request: GenerateContentRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     使用AI生成论文内容
@@ -115,7 +124,7 @@ async def generate_content(
 @router.post("/modify", response_model=Response[GenerateContentResponse], summary="修改内容")
 async def modify_content(
     request: ModifyContentRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     使用AI修改内容
@@ -166,7 +175,7 @@ async def modify_content(
 @router.post("/rating", response_model=Response[bool], summary="提交用户评价和评分")
 async def submit_rating(
     request: SubmitRatingRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     提交用户评价和评分

@@ -7,14 +7,23 @@ from schemas.common import Response
 from routers.auth import get_current_user
 from mongodb import PaperDatabase
 from models import Prompt_Template
+from utils.rate_limiter import rate_limiter
+from config import settings
 
 router = APIRouter()
 db = PaperDatabase()
 
+# 以包为粒度的速率限制依赖（prompts 包统一限速）
+_rate_limit = rate_limiter.make_dependency(
+    package_name="prompts",
+    get_user_fn=get_current_user,
+    **settings.RATE_LIMITS["prompts"],
+)
+
 @router.get("/get/{ppt_id}", response_model=Response[PromptTemplateResponse], summary="获取Prompt模板")
 async def get_prompt(
     ppt_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     根据PPT章节ID获取Prompt模板
@@ -64,7 +73,7 @@ async def get_prompt(
 @router.post("/save", response_model=Response[bool], summary="保存Prompt模板")
 async def save_prompt(
     prompt: PromptTemplateCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     保存或更新Prompt模板
