@@ -22,8 +22,17 @@ import shutil
 from collections import defaultdict
 import pdfplumber
 from PyPDF2 import PdfReader
+from utils.rate_limiter import rate_limiter
+from config import settings
 
 router = APIRouter()
+
+# 以包为粒度的速率限制依赖（knowledge 包统一限速）
+_rate_limit = rate_limiter.make_dependency(
+    package_name="knowledge",
+    get_user_fn=get_current_user,
+    **settings.RATE_LIMITS["knowledge"],
+)
 
 # 配置 HuggingFace 镜像源，避免直接访问官方站点导致超时
 if not os.environ.get("HF_ENDPOINT") and not os.environ.get("HUGGINGFACE_HUB_BASE_URL"):
@@ -58,7 +67,7 @@ def get_knowledge_pdf_text_by_page_in_plumber(pdf_file_path):
 @router.post("/search", response_model=Response[KnowledgeSearchResponse], summary="检索知识库")
 async def search_knowledge(
     request: KnowledgeSearchRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     在知识库中检索相关内容
@@ -108,7 +117,7 @@ async def search_knowledge(
 # @router.post("/upload-pdf", response_model=Response[dict], summary="上传PDF到知识库")
 # async def upload_pdf(
 #     file: UploadFile = File(..., description="PDF文件"),
-#     current_user: dict = Depends(get_current_user)
+#     current_user: dict = Depends(_rate_limit)
 # ):
 #     """
 #     上传PDF文件到知识库
@@ -242,7 +251,7 @@ async def search_knowledge(
 @router.post("/upload-pdf", response_model=Response[dict], summary="上传PDF到知识库")
 async def upload_pdf(
     file: UploadFile = File(..., description="PDF文件"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     上传PDF文件到知识库
@@ -360,7 +369,7 @@ async def upload_pdf(
 
 
 @router.get("/sources", response_model=Response[List[KnowledgeSource]], summary="获取知识来源列表")
-async def get_sources(current_user: dict = Depends(get_current_user)):
+async def get_sources(current_user: dict = Depends(_rate_limit)):
     """
     获取知识库中所有来源列表
     """
@@ -402,7 +411,7 @@ async def get_sources(current_user: dict = Depends(get_current_user)):
 @router.delete("/delete", response_model=Response[bool], summary="删除知识")
 async def delete_knowledge(
     request: DeleteKnowledgeRequest,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     根据来源删除知识库内容
@@ -469,7 +478,7 @@ async def delete_knowledge(
         )
 
 @router.delete("/clear", response_model=Response[bool], summary="清空知识库")
-async def clear_knowledge(current_user: dict = Depends(get_current_user)):
+async def clear_knowledge(current_user: dict = Depends(_rate_limit)):
     """
     清空整个知识库（危险操作）
     """

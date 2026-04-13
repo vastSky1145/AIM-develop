@@ -11,15 +11,24 @@ from schemas.common import Response
 from routers.auth import get_current_user
 from mongodb import PromptFolderDatabase
 from typing import List, Optional
+from utils.rate_limiter import rate_limiter
+from config import settings
 
 router = APIRouter()
 db = PromptFolderDatabase()
+
+# 以包为粒度的速率限制依赖（user_prompts 包统一限速）
+_rate_limit = rate_limiter.make_dependency(
+    package_name="user_prompts",
+    get_user_fn=get_current_user,
+    **settings.RATE_LIMITS["user_prompts"],
+)
 
 # ============ 收藏夹相关路由 ============
 
 @router.get("/folders", response_model=Response[List[FolderResponse]], summary="获取用户的所有收藏夹")
 async def get_folders(
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     获取当前用户的所有收藏夹列表
@@ -42,7 +51,7 @@ async def get_folders(
 @router.post("/folders", response_model=Response[FolderResponse], summary="创建收藏夹")
 async def create_folder(
     folder: FolderCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     创建新的收藏夹
@@ -84,7 +93,7 @@ async def create_folder(
 async def update_folder(
     folder_id: str,
     folder: FolderUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     更新收藏夹信息
@@ -139,7 +148,7 @@ async def update_folder(
 @router.delete("/folders/{folder_id}", response_model=Response[bool], summary="删除收藏夹")
 async def delete_folder(
     folder_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     删除收藏夹（同时删除其下的所有Prompts）
@@ -189,7 +198,7 @@ async def delete_folder(
 @router.get("/list", response_model=Response[List[PromptResponse]], summary="获取指定收藏夹下的所有Prompts")
 async def get_prompts_by_folder(
     folder_id: str = Query(..., description="收藏夹ID"),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     获取指定收藏夹下的所有Prompts
@@ -231,7 +240,7 @@ async def get_prompts_by_folder(
 @router.post("/create", response_model=Response[PromptResponse], summary="创建Prompt")
 async def create_prompt(
     prompt: PromptCreate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     创建新的Prompt
@@ -294,7 +303,7 @@ async def create_prompt(
 async def update_prompt(
     prompt_id: str,
     prompt: PromptUpdate,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     更新Prompt信息（带版本控制）
@@ -371,7 +380,7 @@ async def update_prompt(
 @router.delete("/delete/{prompt_id}", response_model=Response[bool], summary="删除Prompt")
 async def delete_prompt(
     prompt_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     删除Prompt
@@ -419,7 +428,7 @@ async def delete_prompt(
 @router.get("/search", response_model=Response[List[PromptResponse]], summary="搜索Prompts")
 async def search_prompts(
     keyword: str = Query(..., description="搜索关键词", min_length=1),
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     搜索Prompts（按名称、描述、标签）
@@ -446,7 +455,7 @@ async def search_prompts(
 @router.get("/versions/{prompt_id}", response_model=Response[List[PromptVersionResponse]], summary="获取Prompt版本历史")
 async def get_prompt_versions(
     prompt_id: str,
-    current_user: dict = Depends(get_current_user)
+    current_user: dict = Depends(_rate_limit)
 ):
     """
     获取指定Prompt的所有版本历史

@@ -45,5 +45,17 @@ class Settings:
     MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50MB
     ALLOWED_EXTENSIONS = {".pdf", ".ppt", ".pptx"}
 
+    # 速率限制配置（以包为粒度）
+    # max_requests: 时间窗口内允许的最大请求次数
+    # window_seconds: 滑动时间窗口大小（秒）
+    RATE_LIMITS: dict[str, dict[str, int]] = {
+        "ai_assistant": {"max_requests": 20,  "window_seconds": 3600},   # AI生成/修改：每小时 20 次
+        "knowledge":    {"max_requests": 30,  "window_seconds": 3600},   # 知识库操作：每小时 30 次
+        "papers":       {"max_requests": 50,  "window_seconds": 3600},   # 论文管理：每小时 50 次
+        "auth":         {"max_requests": 10,  "window_seconds": 900},    # 登录/认证：每 15 分钟 10 次
+        "prompts":      {"max_requests": 100, "window_seconds": 3600},   # Prompt模板：每小时 100 次
+        "user_prompts": {"max_requests": 100, "window_seconds": 3600},   # 用户Prompt：每小时 100 次
+    }
+
 settings = Settings()
 
