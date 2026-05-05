@@ -286,7 +286,7 @@ class EnhancedKnowledgeBaseApp:
                 # ai分割文本
                 #==============================================================================
                 from utils.textspliter_LLM import ThinkingModelTextSplitter
-                splitter = ThinkingModelTextSplitter(model_client=None, model_name="deepseek-v3")
+                splitter = ThinkingModelTextSplitter(model_client=None, model_name="DeepSeek-V4-Flash")
                 docs = splitter.split_documents(documents)
                 #==============================================================================
                 print("docs", docs)

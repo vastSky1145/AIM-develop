@@ -94,7 +94,7 @@ client = OpenAI(api_key=MY_API_KEY, base_url=API_BASE_URL)
 
 
 # 初始化使用模型
-MODEL_NAME = os.getenv("MY_MODEL", "deepseek-v3")
+MODEL_NAME = os.getenv("MY_MODEL", "DeepSeek-V4-Flash")
 
 def split_chunks_assisted_by_thinking_model(text: str) -> tuple[str,str]:
     """
@@ -126,7 +126,7 @@ def split_chunks_assisted_by_thinking_model(text: str) -> tuple[str,str]:
             max_tokens=1024 * 128,
             temperature=0.7,
             stream=False,
-            # 如果你使用deepseek-v3模型，我们部署的当前版本是V3.1，可以通过以下开关开启思考模式。
+            # 如果你使用deepseek-v4模型，我们部署的当前版本是V4 flash，可以通过以下开关开启思考模式。
             # 具体参考https://github.com/sgl-project/sglang/tree/main/benchmark/deepseek_v3
             # 开启思考模式后，需要取思考内容，需从resp.choices[0].message.reasoning_content
             extra_body={"chat_template_kwargs": {"thinking": True}}

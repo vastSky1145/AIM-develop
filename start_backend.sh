@@ -3,10 +3,10 @@
 echo "正在启动后端服务..."
 
 # 1. 设置代理环境变量
-export http_proxy=http://127.0.0.1:7890
-export https_proxy=http://127.0.0.1:7890
-export HTTP_PROXY=http://127.0.0.1:7890
-export HTTPS_PROXY=http://127.0.0.1:7890
+export http_proxy=http://127.0.0.1:17890
+export https_proxy=http://127.0.0.1:17890
+export HTTP_PROXY=http://127.0.0.1:17890
+export HTTPS_PROXY=http://127.0.0.1:17890
 
 echo "✓ 代理已启用"
 

@@ -45,7 +45,8 @@ def call_llm_sync(prompt: str, enable_reasoning: bool = False) -> tuple:
             
         completion = llm.chat.completions.create(
             # model="gemini-2.5-flash-preview-05-20",
-            model="deepseek-v3",
+            # model="deepseek-v4",
+            model="DeepSeek-V4-Flash",
             reasoning_effort="low",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},

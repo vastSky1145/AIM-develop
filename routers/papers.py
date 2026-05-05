@@ -20,11 +20,17 @@ import json
 import tempfile
 import os
 from pathlib import Path
+import uuid
+import asyncio
 
 from utils.test_pdf_parse_locally import parse_pdf_to_json_locally
+from utils.pdf_to_structure import pdf_to_structured_json
 
 router = APIRouter()
 db = PaperDatabase()
+
+# 内存任务状态表 {task_id: {status, progress, data, error}} — Agent PDF 解析
+_tasks: dict = {}
 
 @router.get("/list", response_model=Response[List[PaperResponse]], summary="获取论文列表")
 async def get_paper_list(current_user: dict = Depends(get_current_user)):
@@ -175,67 +181,142 @@ async def get_paper_list(current_user: dict = Depends(get_current_user)):
 #         if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
 #             os.unlink(tmp_file_path)
 
-#更新的api，不使用doc2x解析
-@router.post("/upload-pdf", response_model=Response[PaperResponse], summary="上传pdf文件并解析")
-async def upload_pdf(
-    file: UploadFile = File(..., description="pdf文件"),
+# ==================== Agent PDF 解析（异步，LLM）====================
+
+async def _run_agent_task(task_id: str, pdf_path: str, user_id: str):
+    """后台运行 Agent 解析，完成后更新任务状态并入库"""
+    try:
+        _tasks[task_id]["progress"] = "Agent 正在分析文档结构，请耐心等待..."
+        result = await asyncio.to_thread(
+            pdf_to_structured_json,
+            pdf_path,
+            user_id
+        )
+        result["uid"] = user_id
+
+        _tasks[task_id]["progress"] = "解析完成，正在保存到数据库..."
+        paper_id = db.save_paper(result)
+        if paper_id is None:
+            raise RuntimeError("保存论文到数据库失败")
+
+        _tasks[task_id].update({
+            "status": "completed",
+            "progress": "保存成功",
+            "data": result
+        })
+    except Exception as e:
+        _tasks[task_id].update({
+            "status": "failed",
+            "progress": "",
+            "error": str(e)
+        })
+    finally:
+        if os.path.exists(pdf_path):
+            os.unlink(pdf_path)
+
+
+@router.post("/upload-pdf", response_model=Response[dict], summary="上传 PDF 并用 Agent 解析（异步）")
+async def upload_pdf_agent(
+    file: UploadFile = File(..., description="PDF 文件"),
     current_user: dict = Depends(get_current_user)
 ):
     """
-    上传pdf文件并解析为论文结构
-
-    - 支持.pdf格式
-    - 自动解析为结构化JSON
-    - 保存到数据库
+    上传 PDF，立即返回 task_id，解析在后台由 LangChain Agent 完成。
+    前端应轮询 GET /papers/task/{task_id} 查询进度。
     """
-    # user_id = current_user.get("user_id")
     user_id = current_user.get("uid")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="无法获取用户信息")
 
-    # 验证文件类型
-    if not file.filename.endswith(('.pdf')):
-        raise HTTPException(
-            status_code=400,
-            detail="只支持pdf文件格式（.pdf）"
-        )
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="只支持 PDF 文件格式（.pdf）")
 
-    # 保存临时文件
+    suffix = Path(file.filename).suffix
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
     try:
-        # 创建临时文件
-        suffix = Path(file.filename).suffix#suffix函数返回文件的后缀名
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp_file:
-            content = await file.read()
-            tmp_file.write(content)
-            tmp_file_path = tmp_file.name
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_file_path = tmp_file.name
+    finally:
+        tmp_file.close()
 
-        # 调用PPT解析函数
-        json_content = parse_pdf_to_json_locally(tmp_file_path)
-        # json_content = pdf_to_json(tmp_file_path, user_id)
+    task_id = str(uuid.uuid4())
+    _tasks[task_id] = {
+        "status": "processing",
+        "progress": "正在启动 Agent 解析...",
+        "data": None,
+        "error": None
+    }
+
+    asyncio.create_task(_run_agent_task(task_id, tmp_file_path, user_id))
+
+    return Response(
+        success=True,
+        message="任务已提交，请轮询查询进度",
+        data={"task_id": task_id, "status": "processing"}
+    )
+
+
+@router.get("/task/{task_id}", response_model=Response[dict], summary="查询 Agent 解析任务状态")
+async def get_task_status(
+    task_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    task = _tasks.get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+
+    return Response(
+        success=True,
+        message="获取任务状态成功",
+        data=task
+    )
+
+
+# ==================== 旧方法 PDF 解析（同步，字符串匹配）====================
+
+@router.post("/upload-pdf-fast", response_model=Response[PaperResponse], summary="上传 PDF 并用字符串匹配解析（同步）")
+async def upload_pdf_fast(
+    file: UploadFile = File(..., description="PDF 文件"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    上传 PDF，使用字符串匹配方式同步解析，速度快但精度较低。
+    """
+    user_id = current_user.get("uid")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="无法获取用户信息")
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="只支持 PDF 文件格式（.pdf）")
+
+    suffix = Path(file.filename).suffix
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    try:
+        content = await file.read()
+        tmp_file.write(content)
+        tmp_file_path = tmp_file.name
+    finally:
+        tmp_file.close()
+
+    try:
+        json_content = await asyncio.to_thread(parse_pdf_to_json_locally, tmp_file_path)
         paper_data = json.loads(json_content)
         paper_data["uid"] = user_id
 
-        # 保存到数据库
         paper_id = db.save_paper(paper_data)
-
         if paper_id is None:
-            raise HTTPException(
-                status_code=500,
-                detail="保存论文到数据库失败"
-            )
+            raise RuntimeError("保存论文到数据库失败")
 
         return Response(
             success=True,
-            message="PPT解析成功",
+            message="PDF 解析成功（字符串匹配）",
             data=paper_data
         )
-
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"PPT解析失败: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"PDF 解析失败: {str(e)}")
     finally:
-        # 清理临时文件
-        if 'tmp_file_path' in locals() and os.path.exists(tmp_file_path):
+        if os.path.exists(tmp_file_path):
             os.unlink(tmp_file_path)
 
 

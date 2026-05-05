@@ -193,27 +193,79 @@
       <span :class="['status-text', statusType]">{{ statusText }}</span>
     </div>
 
-    <!-- 上传PPT对话框 -->
-    <el-dialog v-model="uploadDialogVisible" title="上传PPT" width="500px">
+    <!-- 上传 PDF 论文对话框 -->
+    <el-dialog
+      v-model="uploadDialogVisible"
+      title="上传 PDF 论文"
+      width="500px"
+      :close-on-click-modal="!uploading"
+      :close-on-press-escape="!uploading"
+    >
       <el-upload
         drag
         :auto-upload="false"
         :on-change="handleFileChange"
         :limit="1"
         accept=".pdf"
+        :disabled="uploading"
       >
-      <!-- 暂时改动：accept=".ppt,.pptx"改为accept=".pdf" -->
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">拖拽文件到此处 或 <em>点击上传</em></div>
         <template #tip>
           <div class="el-upload__tip">仅支持 .pdf 格式的文件</div>
-          <!-- 暂时改动：accept=".ppt,.pptx"改为accept=".pdf" -->
         </template>
       </el-upload>
+
+      <div style="margin-top: 16px">
+        <el-divider content-position="left">解析方式</el-divider>
+        <el-radio-group
+          v-model="parseMethod"
+          :disabled="uploading"
+          style="display: flex; flex-direction: column; gap: 8px"
+        >
+          <el-radio value="agent">
+            <span style="font-weight: 600">Agent 智能解析</span>
+            <span style="color: #888; font-size: 12px; margin-left: 6px"
+              >（LLM 语义理解，精度高，耗时 1-3 分钟）</span
+            >
+          </el-radio>
+          <el-radio value="fast">
+            <span style="font-weight: 600">快速解析</span>
+            <span style="color: #888; font-size: 12px; margin-left: 6px"
+              >（字符串匹配，速度快，依赖格式规范）</span
+            >
+          </el-radio>
+        </el-radio-group>
+      </div>
+
+      <div v-if="uploading" style="margin-top: 16px">
+        <template v-if="parseMethod === 'agent'">
+          <el-progress
+            :percentage="uploadProgress"
+            :stroke-width="8"
+            status="striped"
+            striped
+            striped-flow
+            :duration="8"
+          />
+          <p style="text-align: center; color: #666; margin-top: 8px; font-size: 13px">
+            {{ uploadProgressText }}
+          </p>
+        </template>
+        <template v-else>
+          <p style="text-align: center; color: #666; font-size: 13px">
+            {{ uploadProgressText || "正在解析中，请稍候..." }}
+          </p>
+        </template>
+      </div>
+
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
+        <el-button :disabled="uploading" @click="uploadDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="uploading" @click="confirmUpload">
-          {{ uploading ? "上传中..." : "确定上传" }}
+          <template v-if="uploading">
+            {{ parseMethod === "agent" ? "Agent 解析中..." : "解析中..." }}
+          </template>
+          <template v-else>确定上传</template>
         </el-button>
       </template>
     </el-dialog>
@@ -286,7 +338,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from "vue";
+import { ref, reactive, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { ElMessage, ElMessageBox } from "element-plus";
 import { UploadFilled, Plus, Top, Delete } from "@element-plus/icons-vue";
@@ -321,6 +373,10 @@ const statusType = ref("success");
 const uploadDialogVisible = ref(false);
 const uploading = ref(false);
 const uploadFile = ref(null);
+const uploadProgress = ref(0);
+const uploadProgressText = ref("");
+const parseMethod = ref("agent"); // 'agent' | 'fast'
+let _pollTimer = null;
 
 // 编辑相关
 const editDialogVisible = ref(false);
@@ -593,6 +649,13 @@ const handleFileChange = (file) => {
   console.log("选择文件:", uploadFile.value);
 };
 
+const _stopPoll = () => {
+  if (_pollTimer) {
+    clearInterval(_pollTimer);
+    _pollTimer = null;
+  }
+};
+
 const confirmUpload = async () => {
   if (!uploadFile.value) {
     ElMessage.warning("请先选择文件");
@@ -600,34 +663,73 @@ const confirmUpload = async () => {
   }
 
   uploading.value = true;
-  updateStatus("正在上传和解析PPT...", "warning");
-
+  uploadProgress.value = 10;
+  uploadProgressText.value = "正在上传文件...";
+  updateStatus(
+    `正在上传 PDF（${parseMethod.value === "agent" ? "Agent 解析" : "快速解析"}）...`,
+    "warning"
+  );
 
   try {
-    // const response = await paperAPI.uploadPPT(uploadFile.value)
-    const response = await paperAPI.uploadPDF(uploadFile.value)
-    // 暂时改动：uploadPPT改为uploadPDF
+    if (parseMethod.value === "agent") {
+      const submitResp = await paperAPI.uploadPDF(uploadFile.value);
+      if (!submitResp.success) throw new Error(submitResp.message || "上传失败");
 
-    if (response.success) {
-      ElMessage.success('PPT上传成功')
-      uploadDialogVisible.value = false
-      uploadFile.value = null
+      const taskId = submitResp.data.task_id;
+      uploadProgress.value = 20;
+      uploadProgressText.value =
+        "Agent 正在分析文档结构，请耐心等待（约 1-3 分钟）...";
 
-      // 重新加载论文列表
-      await loadPapers()
-      updateStatus('PPT解析完成', 'success')
+      await new Promise((resolve, reject) => {
+        _pollTimer = setInterval(async () => {
+          try {
+            const pollResp = await paperAPI.getTaskStatus(taskId);
+            const task = pollResp.data;
+
+            if (task.status === "completed") {
+              _stopPoll();
+              uploadProgress.value = 100;
+              uploadProgressText.value = "解析完成！";
+              resolve(task.data);
+            } else if (task.status === "failed") {
+              _stopPoll();
+              reject(new Error(task.error || "Agent 解析失败"));
+            } else {
+              if (uploadProgress.value < 90) uploadProgress.value += 2;
+              if (task.progress) uploadProgressText.value = task.progress;
+            }
+          } catch (e) {
+            _stopPoll();
+            reject(e);
+          }
+        }, 3000);
+      });
     } else {
-      ElMessage.error(response.message || 'PPT上传失败')
-      updateStatus('上传失败', 'error')
+      uploadProgressText.value = "字符串匹配解析中，请稍候...";
+      const resp = await paperAPI.uploadPDFFast(uploadFile.value);
+      if (!resp.success) throw new Error(resp.message || "快速解析失败");
     }
+
+    ElMessage.success("PDF 解析完成，论文已保存");
+    uploadDialogVisible.value = false;
+    uploadFile.value = null;
+    await loadPapers();
+    updateStatus("PDF 解析完成", "success");
   } catch (error) {
-    console.error('上传PPT失败:', error)
-    ElMessage.error(error.detail || 'PPT上传失败')
-    updateStatus('上传失败', 'error')
+    console.error("PDF 上传/解析失败:", error);
+    ElMessage.error(error.detail || error.message || "PDF 上传失败");
+    updateStatus("解析失败", "error");
   } finally {
-    uploading.value = false
+    _stopPoll();
+    uploading.value = false;
+    uploadProgress.value = 0;
+    uploadProgressText.value = "";
   }
 };
+
+onUnmounted(() => {
+  _stopPoll();
+});
 
 // 删除论文
 const handleDeletePaper = async () => {

@@ -23,7 +23,13 @@ import os
 from typing import List, Optional, Dict, Any
 
 from utils.pdf_extractor import PDFTextExtractor, extract_pdf_for_agent, PageContent
-from utils.pdf_structure_agent import PDFStructureAgent, create_pdf_structure_agent
+from utils.pdf_structure_agent import (
+    DEFAULT_MAX_PARALLEL_SECTIONS,
+    DEFAULT_OUTLINE_MAX_TOKENS,
+    DEFAULT_SECTION_MAX_TOKENS,
+    PDFStructureAgent,
+    create_pdf_structure_agent,
+)
 
 
 def pdf_to_structured_json(
@@ -37,7 +43,10 @@ def pdf_to_structured_json(
     base_url: str = None,
     model_name: str = None,
     verbose: bool = True,
-    output_path: str = None
+    output_path: str = None,
+    outline_max_tokens: int = DEFAULT_OUTLINE_MAX_TOKENS,
+    section_max_tokens: int = DEFAULT_SECTION_MAX_TOKENS,
+    max_parallel_sections: int = DEFAULT_MAX_PARALLEL_SECTIONS,
 ) -> Dict[str, Any]:
     """
     将PDF转换为层次化JSON结构
@@ -91,12 +100,7 @@ def pdf_to_structured_json(
     #         extractor.add_filter_pattern(pattern)
     
     pages = extractor.extract_pages(pdf_path)
-    #将pages保存为json文件
-    with open('pages.jsonl', 'w', encoding='utf-8') as f:
-        for p in pages:
-            json.dump(p.__dict__, f, ensure_ascii=False, indent=2)
-            f.write('\n')
-    
+
     
     if verbose:
         print(f"[PDF结构化] 共提取 {len(pages)} 页")
@@ -120,12 +124,15 @@ def pdf_to_structured_json(
         api_key=api_key,
         base_url=base_url,
         model_name=model_name,
-        verbose=verbose
+        verbose=verbose,
+        outline_max_tokens=outline_max_tokens,
+        section_max_tokens=section_max_tokens,
+        max_parallel_sections=max_parallel_sections,
     )
-    
+
     if verbose:
-        print("[PDF结构化] 开始结构化分析...")
-    
+        print("[PDF结构化] 开始结构化分析（多 Agent 协同）...")
+
     result = agent.process_pages(agent_pages, paper_title=paper_title)
     
     # Step 4: 保存结果（如果指定了输出路径）

@@ -85,11 +85,26 @@ export const paperAPI = {
   uploadPPT(jsonData) {
     return api.post('/papers/upload-ppt', jsonData)
   },
+  // Agent 解析：仅提交任务，不等解析完成
   uploadPDF(file) {
     const formData = new FormData()
     formData.append('file', file)
     return api.post('/papers/upload-pdf', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000
+    })
+  },
+  // 查询 Agent 解析任务状态
+  getTaskStatus(taskId) {
+    return api.get(`/papers/task/${taskId}`)
+  },
+  // 快速解析（字符串匹配，同步）
+  uploadPDFFast(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/papers/upload-pdf-fast', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 120000
     })
   },
   // 创建论文
