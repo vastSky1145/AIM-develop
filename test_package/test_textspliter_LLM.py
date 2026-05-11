@@ -94,6 +94,7 @@ client = OpenAI(api_key=MY_API_KEY, base_url=API_BASE_URL)
 
 
 # 初始化使用模型
+# MODEL_NAME = 
 MODEL_NAME = os.getenv("MY_MODEL", "DeepSeek-V4-Flash")
 
 def split_chunks_assisted_by_thinking_model(text: str) -> tuple[str,str]:
