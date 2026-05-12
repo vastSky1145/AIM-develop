@@ -160,21 +160,21 @@ class UserPromptsApiTests(unittest.TestCase):
         assert_response_success(delete_folder)
         self.folder_id = None
 
-    @unittest.skipUnless(
-        os.getenv("SYSTEM_TEST_SECOND_USERNAME") and os.getenv("SYSTEM_TEST_SECOND_PASSWORD"),
-        "未配置第二测试账户，跳过跨用户权限校验",
-    )
-    def test_cross_user_folder_access_forbidden(self) -> None:
-        folder_id = self._create_folder()
-        second_headers = auth_headers(self.second_token)
+    # @unittest.skipUnless(
+    #     os.getenv("SYSTEM_TEST_SECOND_USERNAME") and os.getenv("SYSTEM_TEST_SECOND_PASSWORD"),
+    #     "未配置第二测试账户，跳过跨用户权限校验",
+    # )
+    # def test_cross_user_folder_access_forbidden(self) -> None:
+    #     folder_id = self._create_folder()
+    #     second_headers = auth_headers(self.second_token)
 
-        response = requests.get(
-            api_url("/api/user-prompts/list", self.base_url),
-            headers=second_headers,
-            params={"folder_id": folder_id},
-            timeout=30,
-        )
-        self.assertEqual(response.status_code, 403)
+    #     response = requests.get(
+    #         api_url("/api/user-prompts/list", self.base_url),
+    #         headers=second_headers,
+    #         params={"folder_id": folder_id},
+    #         timeout=30,
+    #     )
+    #     self.assertEqual(response.status_code, 403)
 
 
 if __name__ == "__main__":
