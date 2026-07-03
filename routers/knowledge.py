@@ -32,8 +32,9 @@ if not os.environ.get("HF_ENDPOINT") and not os.environ.get("HUGGINGFACE_HUB_BAS
     os.environ["HUGGINGFACE_HUB_BASE_URL"] = mirror_url
 
 # 初始化向量数据库
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
+# embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+embeddings = HuggingFaceEmbeddings(model_name="/home/ght/ai_models/paraphrase-multilingual-MiniLM-L12-v2")
+vectorstore = Chroma(persist_directory="./chroma_db", embedding_function=embeddings,collection_metadata={"hnsw:space": "cosine"})
 text_splitter = CharacterTextSplitter(chunk_size=800, chunk_overlap=150)
 
 
@@ -76,9 +77,19 @@ async def search_knowledge(
 
     try:
         # 执行相似度搜索
-        docs = vectorstore.similarity_search(request.query, k=request.k, filter={"uid": user_id})
-
+        # docs = vectorstore.similarity_search(request.query, k=request.k, filter={"uid": user_id})
+        docs = vectorstore.similarity_search_with_relevance_scores(request.query, k=request.k, filter={"uid": user_id})
+        print("----------------------------------------------------------")
+        print(f"查询文本：{request.query[:50]}")
+        for doc in docs:
+            print(f"相关度：{doc[1]}")
+            print(f"文档内容：{doc[0].page_content[:50]}")
+            print(f"文档来源：{doc[0].metadata.get('source', '未知')}")
+            print(f"文档元数据：{doc[0].metadata}")
+            print("----------------------------------------------------------")
+        print("----------------------------------------------------------")
         # 构造响应
+        docs = vectorstore.similarity_search(request.query, k=request.k, filter={"uid": user_id})
         documents = [
             KnowledgeDocument(
                 content=doc.page_content,
@@ -267,11 +278,11 @@ async def upload_pdf(
         )
 
     # 验证文件名（不允许空格）
-    if ' ' in file.filename:
-        raise HTTPException(
-            status_code=400,
-            detail=f"文件名不允许包含空格：{file.filename}"
-        )
+    # if ' ' in file.filename:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail=f"文件名不允许包含空格：{file.filename}"
+    #     )
 
     # 检查是否已存在
     try:
@@ -306,7 +317,7 @@ async def upload_pdf(
             texts_in_page = get_knowledge_pdf_text_by_page_in_plumber(tmp_file_path)
 
         # 合并所有页面文本
-        raw_content = "\n".join([text for text in texts_in_page if text])
+        raw_content = "\n\n".join([text for text in texts_in_page if text])
 
         # 保存解析内容
         file_stem = Path(original_filename).stem

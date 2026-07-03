@@ -246,11 +246,11 @@ const handleFileChange = (file, fileList) => {
     return
   }
 
-  if (file.name.includes(' ')) {
-    ElMessage.error('文件名不能包含空格')
-    syncPendingFiles(fileList.filter((item) => item.uid !== file.uid))
-    return
-  }
+  // if (file.name.includes(' ')) {
+  //   ElMessage.error('文件名不能包含空格')
+  //   syncPendingFiles(fileList.filter((item) => item.uid !== file.uid))
+  //   return
+  // }
 
   syncPendingFiles(fileList)
 }
