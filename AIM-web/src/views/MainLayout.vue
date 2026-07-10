@@ -7,6 +7,13 @@
       </div>
       <div class="user-info">
         <span>用户: {{ userInfo.username }}</span>
+        <el-button
+          :type="viewMode === 'reading' ? 'success' : 'primary'"
+          size="small"
+          @click="toggleReadingMode"
+        >
+          {{ viewMode === "reading" ? "退出阅读模式" : "阅读模式" }}
+        </el-button>
         <el-button type="warning" size="small" @click="handleChangePassword"
           >修改密码</el-button
         >
@@ -16,8 +23,17 @@
       </div>
     </div>
 
-    <!-- 三栏布局 -->
-    <div class="content-wrapper">
+    <!-- 阅读模式 -->
+    <div v-if="viewMode === 'reading'" class="content-wrapper">
+      <ReadingMode
+        :paper-title="selectedPaper?.paper_title || ''"
+        :sections="treeData"
+        @save="handleSavePaper"
+      />
+    </div>
+
+    <!-- 三栏布局（编辑模式） -->
+    <div v-else class="content-wrapper">
       <!-- A区：论文列表 (20%) -->
       <div class="panel panel-a">
         <div class="panel-header">
@@ -344,12 +360,30 @@ import { ElMessage, ElMessageBox } from "element-plus";
 import { UploadFilled, Plus, Top, Delete } from "@element-plus/icons-vue";
 import { paperAPI, authAPI } from "@/api";
 import EditNodeDialog from "@/components/EditNodeDialog.vue";
+import ReadingMode from "@/components/ReadingMode.vue";
 import { parse } from "pptxtojson";
 
 const router = useRouter();
 
 // 用户信息
 const userInfo = ref(JSON.parse(localStorage.getItem("userInfo") || "{}"));
+
+// 视图模式：'edit' | 'reading'
+const viewMode = ref("edit");
+
+// 切换阅读模式
+const toggleReadingMode = () => {
+  if (viewMode.value === "reading") {
+    viewMode.value = "edit";
+    return;
+  }
+  if (!selectedPaper.value) {
+    ElMessage.warning("请先选择一篇论文");
+    return;
+  }
+  viewMode.value = "reading";
+  updateStatus(`阅读模式: ${selectedPaper.value.paper_title}`, "success");
+};
 
 // 论文列表
 const papers = ref([]);
