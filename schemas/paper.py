@@ -11,6 +11,11 @@ class PaperSection(BaseModel):
     title: str = Field(..., description="章节标题")
     content: str = Field(default="", description="章节内容")
     children: List['PaperSection'] = Field(default_factory=list, description="子章节")
+     # 25-7-10更新，缺此3字段则无法写回数据库
+    promptId: Optional[str] = Field(default=None, description="绑定的提示词ID")
+    promptName: Optional[str] = Field(default=None, description="绑定的提示词名称")
+    promptContent: Optional[str] = Field(default=None, description="绑定的提示词内容")
+
 
 class PaperBase(BaseModel):
     """论文基础信息"""
