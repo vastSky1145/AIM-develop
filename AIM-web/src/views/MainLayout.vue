@@ -103,10 +103,27 @@
             type="warning"
             size="small"
             @click="handleSavePaper"
-            style="width: 100%"
+            style="width: 100%; margin-bottom: 8px"
           >
             保存论文
           </el-button>
+          <el-button
+            type="info"
+            plain
+            size="small"
+            @click="importExportDialogVisible = true"
+            style="width: 100%; margin-left: 0"
+          >
+            导入 / 导出
+          </el-button>
+          <!-- 隐藏的文件选择框，用于导入论文 JSON -->
+          <input
+            ref="importInputRef"
+            type="file"
+            accept=".json,application/json"
+            style="display: none"
+            @change="handleImportFileChange"
+          />
         </div>
       </div>
 
@@ -350,6 +367,44 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 导入 / 导出对话框 -->
+    <el-dialog
+      v-model="importExportDialogVisible"
+      title="论文导入 / 导出"
+      width="420px"
+    >
+      <div class="import-export-actions">
+        <el-button
+          type="primary"
+          plain
+          size="large"
+          @click="handleExportPaper"
+        >
+          导出 JSON
+        </el-button>
+        <el-button
+          type="success"
+          plain
+          size="large"
+          @click="handleImportPaper"
+        >
+          导入 JSON
+        </el-button>
+        <el-button
+          type="warning"
+          plain
+          size="large"
+          :loading="exportingPdf"
+          @click="handleExportPDF"
+        >
+          {{ exportingPdf ? "正在生成 PDF..." : "导出 PDF" }}
+        </el-button>
+      </div>
+      <template #footer>
+        <el-button @click="importExportDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -362,6 +417,7 @@ import { paperAPI, authAPI } from "@/api";
 import EditNodeDialog from "@/components/EditNodeDialog.vue";
 import ReadingMode from "@/components/ReadingMode.vue";
 import { parse } from "pptxtojson";
+import { exportPaperToPdf } from "@/utils/exportPdf";
 
 const router = useRouter();
 
@@ -803,6 +859,155 @@ const handleDeletePaper = async () => {
   }
 };
 
+// ==================== 论文导入 / 导出 ====================
+
+// 导入 / 导出对话框可见性
+const importExportDialogVisible = ref(false);
+
+// 导入文件输入框引用
+const importInputRef = ref(null);
+
+// 导出 PDF 加载状态
+const exportingPdf = ref(false);
+
+// 导出当前选中的论文为 JSON 文件
+const handleExportPaper = () => {
+  if (!selectedPaper.value) {
+    ElMessage.warning("请先选择要导出的论文");
+    return;
+  }
+
+  const exportData = {
+    type: "aim-paper",
+    version: 1,
+    exported_at: new Date().toISOString(),
+    paper_title: selectedPaper.value.paper_title,
+    sections: treeData.value,
+  };
+
+  try {
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    // 文件名去除非法字符
+    const safeTitle = (selectedPaper.value.paper_title || "paper").replace(
+      /[\\/:*?"<>|]/g,
+      "_"
+    );
+    a.download = `${safeTitle}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    ElMessage.success(`论文《${selectedPaper.value.paper_title}》已导出`);
+    updateStatus(`已导出论文: ${selectedPaper.value.paper_title}`, "success");
+    importExportDialogVisible.value = false;
+  } catch (error) {
+    console.error("导出论文失败:", error);
+    ElMessage.error("导出论文失败");
+    updateStatus("导出失败", "error");
+  }
+};
+
+// 导出当前选中论文为 PDF 文件
+const handleExportPDF = async () => {
+  if (!selectedPaper.value) {
+    ElMessage.warning("请先选择要导出的论文");
+    return;
+  }
+
+  exportingPdf.value = true;
+  updateStatus(`正在生成 PDF: ${selectedPaper.value.paper_title}...`, "warning");
+
+  try {
+    await exportPaperToPdf(selectedPaper.value.paper_title, treeData.value);
+
+    ElMessage.success(`论文《${selectedPaper.value.paper_title}》已导出为 PDF`);
+    updateStatus(`已导出 PDF: ${selectedPaper.value.paper_title}`, "success");
+    importExportDialogVisible.value = false;
+  } catch (error) {
+    console.error("导出 PDF 失败:", error);
+    ElMessage.error("导出 PDF 失败");
+    updateStatus("导出 PDF 失败", "error");
+  } finally {
+    exportingPdf.value = false;
+  }
+};
+
+// 触发文件选择
+const handleImportPaper = () => {
+  importInputRef.value?.click();
+};
+
+// 处理导入的 JSON 文件
+const handleImportFileChange = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    // 兼容两种格式：导出格式 或 原始论文对象
+    let paperTitle = data.paper_title;
+    const sections = data.sections;
+
+    if (!paperTitle || !Array.isArray(sections)) {
+      throw new Error("JSON 缺少 paper_title 或 sections 字段");
+    }
+
+    // 若标题已存在，让用户重新命名
+    if (papers.value.some((p) => p.paper_title === paperTitle)) {
+      const { value } = await ElMessageBox.prompt(
+        `已存在同名论文《${paperTitle}》，请输入新的论文标题`,
+        "论文标题冲突",
+        {
+          confirmButtonText: "确定导入",
+          cancelButtonText: "取消",
+          inputValue: `${paperTitle}_导入`,
+          inputPattern: /\S+/,
+          inputErrorMessage: "论文标题不能为空",
+        }
+      );
+      paperTitle = value.trim();
+    }
+
+    updateStatus(`正在导入论文: ${paperTitle}...`, "warning");
+
+    const response = await paperAPI.create({
+      paper_title: paperTitle,
+      uid: userInfo.value.user_id,
+      sections,
+    });
+
+    if (response.success) {
+      ElMessage.success(`论文《${paperTitle}》导入成功`);
+      updateStatus(`已导入论文: ${paperTitle}`, "success");
+      importExportDialogVisible.value = false;
+      await loadPapers();
+    } else {
+      throw new Error(response.message || "导入失败");
+    }
+  } catch (error) {
+    if (error === "cancel") {
+      // 用户取消命名
+    } else if (error instanceof SyntaxError) {
+      ElMessage.error("JSON 文件格式错误，无法解析");
+      updateStatus("导入失败", "error");
+    } else {
+      console.error("导入论文失败:", error);
+      ElMessage.error(error.detail || error.message || "导入论文失败");
+      updateStatus("导入失败", "error");
+    }
+  } finally {
+    // 重置输入框，保证同一文件可再次选择
+    event.target.value = "";
+  }
+};
+
 // 保存论文
 const handleSavePaper = async () => {
   if (!selectedPaper.value) {
@@ -1218,6 +1423,17 @@ onMounted(() => {
 
 :deep(.el-upload-dragger) {
   padding: 40px;
+}
+
+.import-export-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.import-export-actions .el-button {
+  width: 100%;
+  margin-left: 0;
 }
 </style>
 
