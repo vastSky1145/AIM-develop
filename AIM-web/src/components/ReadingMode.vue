@@ -89,7 +89,7 @@
 
           <div v-if="previewContent" class="prompt-preview">
             <div class="prompt-preview-name" v-if="previewName">
-              📌 {{ previewName }}
+             {{ previewName }}
             </div>
             <pre class="prompt-preview-text">{{ previewContent }}</pre>
           </div>
@@ -148,7 +148,7 @@ const ReadingSection = {
           [
             h("span", props.section.title || "（无标题）"),
             props.section.promptId
-              ? h("span", { class: "bound-mark", title: "已绑定提示词" }, " 🔖")
+              ? h("span", { class: "bound-mark", title: "已绑定提示词" }, " （已绑定）")
               : null,
           ]
         )
