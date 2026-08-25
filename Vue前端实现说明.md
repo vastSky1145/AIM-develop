@@ -207,7 +207,8 @@ def setup_C_area(self):
       <div v-for="(section, index) in outlineSections"
            class="outline-item"
            @contextmenu.prevent="handleOutlineRightClick">
-        <span class="status-icon">{{ section.completed ? '✓' : '✗' }}</span>
+           有待实现
+        <!-- <span class="status-icon">{{ section.completed ? '✓' : '✗' }}</span> -->
         <span class="section-title">{{ section.title }}</span>
       </div>
     </div>

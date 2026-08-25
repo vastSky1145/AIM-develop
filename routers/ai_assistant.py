@@ -25,7 +25,7 @@ def call_llm_sync(prompt: str) -> str:
             # model="gemini-2.5-flash-preview-05-20",
             # model="deepseek-v3",
             model="DeepSeek-V4-Flash",
-            reasoning_effort="low",
+            reasoning_effort="max",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant."},
                 {"role": "user", "content": prompt}

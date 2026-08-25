@@ -13,7 +13,7 @@ print(user2)
 #插入另一个user，用户名为test，密码为123456
 password = "123456"
 password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
-collection.insert_one({"username": "test", "password_hash": password_hash})
+collection.insert_one({"username": "wk", "password_hash": password_hash})
 
 # 删除test用户
 # collection.delete_one({"username": "test"})

@@ -1,4 +1,34 @@
-<!-- dfe0a4c6-50eb-4b6d-802a-4e50e8512ea8 070e0353-11e8-4c21-9a16-89343926a28a -->
+---
+name: Prompt版本控制功能实现计划
+overview: ""
+todos:
+  - id: e3d2204e-cd40-4f18-b5ea-4382507793c7
+    content: 创建schemas/user_prompt.py，定义收藏夹和Prompt的数据模型
+    status: pending
+  - id: 851e279a-f83c-4b67-a92e-62b5c77a0e6d
+    content: 扩展mongodb.py，添加PromptFolderDatabase类实现数据库操作
+    status: pending
+  - id: f1ca6049-d6fa-4ac2-ac05-da9819a3db91
+    content: 创建routers/user_prompts.py，实现收藏夹和Prompt的API路由
+    status: pending
+  - id: fcc83e6f-6e0b-44a2-83f6-ba467cdc2231
+    content: 在app.py中注册新的路由模块
+    status: pending
+  - id: 9a923b2c-939d-4376-b3db-1cf97625c615
+    content: 在src/api/index.js中添加userPromptAPI封装
+    status: pending
+  - id: 67682f1d-4fb4-4ed9-9c76-6df3f52ea54d
+    content: 修改EditNodeDialog.vue，添加收藏夹和Prompt下拉列表
+    status: pending
+  - id: debc9c3a-5eda-4c18-a5bc-78e96f2f2c55
+    content: 创建src/views/PromptManage.vue，实现Prompt管理页面
+    status: pending
+  - id: 730ceda9-a69a-4182-8b40-700c2919cea4
+    content: 在router.js中添加Prompt管理页面路由
+    status: pending
+isProject: false
+---
+
 # Prompt版本控制功能实现计划
 
 ## 一、数据库设计（MongoDB）
@@ -326,14 +356,3 @@ const diff = Diff.diffWords(version1.content, version2.content)
 **可选依赖**：
 
 1. `npm install diff` - 用于版本差异对比显示
-
-### To-dos
-
-- [ ] 创建schemas/user_prompt.py，定义收藏夹和Prompt的数据模型
-- [ ] 扩展mongodb.py，添加PromptFolderDatabase类实现数据库操作
-- [ ] 创建routers/user_prompts.py，实现收藏夹和Prompt的API路由
-- [ ] 在app.py中注册新的路由模块
-- [ ] 在src/api/index.js中添加userPromptAPI封装
-- [ ] 修改EditNodeDialog.vue，添加收藏夹和Prompt下拉列表
-- [ ] 创建src/views/PromptManage.vue，实现Prompt管理页面
-- [ ] 在router.js中添加Prompt管理页面路由

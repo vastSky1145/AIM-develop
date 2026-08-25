@@ -26,7 +26,8 @@ class PaperAssistantApp:
         self.current_controller = None
         self.paper = ResearchPaperManager()
         # 主界面布局
-        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        # self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        self.embeddings = HuggingFaceEmbeddings(model_name="/home/ght/ai_models/paraphrase-multilingual-MiniLM-L12-v2")
         self.vectorstore = Chroma(persist_directory="./chroma_db",
                                  embedding_function=self.embeddings)
         self.setup_ui()

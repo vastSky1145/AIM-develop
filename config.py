@@ -28,7 +28,8 @@ class Settings:
     
     # 向量数据库配置
     CHROMA_PERSIST_DIR = "./chroma_db"
-    EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+    # EMBEDDING_MODEL = "all-MiniLM-L6-v2"
+    EMBEDDING_MODEL = "/home/ght/ai_models/paraphrase-multilingual-MiniLM-L12-v2"
     
     # 文档处理配置
     DOC2X_API_KEY = os.getenv("DOC2X_API_KEY", "sk-bzllfk7oftj7tv4he6rc7bfdz92iqtn0")

@@ -109,11 +109,12 @@ if __name__ == '__main__':
     # root.withdraw()
     # pdf_file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
     # pdf_file_path = "D:/研究生资料/本科生教改论文/测试.pdf"
-    pdf_file_path = "D:/研究生资料/本科生教改论文/WASA_6-17.pdf"
+    # pdf_file_path = "D:/研究生资料/本科生教改论文/WASA_6-17.pdf"
 
-    if pdf_file_path:
-        print(f"选择的文件: {pdf_file_path}")
+    # if pdf_file_path:
+    #     print(f"选择的文件: {pdf_file_path}")
 
-        extract_text_from_pdf(pdf_file_path)
-    else:
-        print("未选择文件")
+    #     extract_text_from_pdf(pdf_file_path)
+    # else:
+    #     print("未选择文件")
+    call_llm_sync("请自我介绍", enable_reasoning=False)

@@ -31,7 +31,8 @@ class EnhancedKnowledgeBaseApp:
         self.root.geometry("900x700")
 
         # 初始化向量数据库组件
-        self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        # self.embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        self.embeddings = HuggingFaceEmbeddings(model_name="/home/ght/ai_models/paraphrase-multilingual-MiniLM-L12-v2")
         self.vectorstore = Chroma(persist_directory="./chroma_db",
                                   embedding_function=self.embeddings)
         self.text_splitter = CharacterTextSplitter(
